@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL = "mysql://mock-host:3306/test_db";
+  process.env.JWT_SECRET = "test-jwt-secret-at-least-32-characters-long";
+});
+
 const testState = vi.hoisted(() => ({
   selectResults: [] as unknown[][],
   inserts: [] as { table: unknown; values: Record<string, unknown> }[],
