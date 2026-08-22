@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+dist
+.manus-logs
+.env
+.env.*
+!.env.example
+*.local
+coverage
+*.log
+npm-debug.log*
+pnpm-debug.log*
+Dockerfile*
+LienGuard_Local_Package.zip
+LienGuard_Local_Package.zip.sha256

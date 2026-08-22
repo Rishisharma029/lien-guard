@@ -18,6 +18,8 @@
 </p>
 
 [**Explore Live Documentation (GitHub Pages)**](./docs/index.html) &bull;
+[**Hosting Handoff**](./HOSTING_HANDOFF.md) &bull;
+[**Local Demo**](./docs/local_demo.md) &bull;
 [**Architecture**](./ARCHITECTURE.md) &bull;
 [**Contributing**](./CONTRIBUTING.md) &bull;
 [**Security Policy**](./SECURITY.md)
@@ -45,6 +47,7 @@
 - [tRPC API Reference](#-trpc-api-reference)
 - [Testing & Quality Assurance](#-testing--quality-assurance)
 - [GitHub Pages Deployment](#-github-pages-deployment)
+- [Hosting Handoff](#-hosting-handoff)
 - [Project Directory Structure](#-project-directory-structure)
 - [Security & Governance](#-security--governance)
 - [Contributing & Community](#-contributing--community)
@@ -403,11 +406,15 @@ pnpm run build
 
 ## 🌐 GitHub Pages Deployment
 
-The documentation site is pre-configured for **GitHub Pages**:
+GitHub Pages publishes **documentation only**; it does not run the LienGuard Node backend, database, protected authentication, email flow, or webhook endpoints. The documentation site is pre-configured for GitHub Pages:
 
 1. Static documentation assets live in the [`docs/`](./docs) directory.
 2. The GitHub Actions workflow [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml) automatically publishes updates on push to `main`.
 3. You can also view the documentation locally by opening `docs/index.html` in any modern web browser.
+
+## 🚀 Hosting Handoff
+
+For the complete frontend and backend deployment package, start with [`HOSTING_HANDOFF.md`](./HOSTING_HANDOFF.md). It describes the included Docker image, required server-side environment variables, MySQL migration sequence, and the difference between a static Vercel preview and a full LienGuard runtime. For a no-secret visual walkthrough before deployment, run [`pnpm demo:local`](./docs/local_demo.md).
 
 ---
 
