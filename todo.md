@@ -39,6 +39,6 @@
 - [x] Add tRPC tests for Case lifecycle updates and case-access ownership enforcement.
 - [x] Verify the authenticated Case Management error card and retry action in a live browser session.
 - [x] Capture inspectable authenticated Case Management preview evidence after final validation.
-- [x] Copy the completed LienGuard project source to the connected local LienGuard folder.
+- [ ] Copy the completed LienGuard project source to the connected local LienGuard folder.
 - [ ] Create a new private GitHub repository for the completed LienGuard source.
 - [ ] Push the latest project source to the new private GitHub repository and verify the result.

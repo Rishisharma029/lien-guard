@@ -1,7 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AdminUsers from "@/pages/AdminUsers";
-import CaseDetail from "@/pages/CaseDetail";
 import Cases from "@/pages/Cases";
 import Home from "@/pages/Home";
 import NotFound from "@/pages/NotFound";
@@ -25,17 +24,12 @@ function CasesRoute() {
   return <DashboardLayout><Cases /></DashboardLayout>;
 }
 
-function CaseDetailRoute() {
-  return <DashboardLayout><CaseDetail /></DashboardLayout>;
-}
-
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/workspace" component={WorkspaceRoute} />
       <Route path="/cases" component={CasesRoute} />
-      <Route path="/cases/:caseId" component={CaseDetailRoute} />
       <Route path="/admin/users" component={UserManagementRoute} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

@@ -1,37 +1,39 @@
+# ==============================================================================
+# LienGuard Root .gitignore
+# ==============================================================================
+
+# Redundant staging / local snapshot directories
+app-source/
+app-source-complete/
+
 # Dependencies
-**/node_modules
+node_modules/
+**/node_modules/
 .pnpm-store/
+jspm_packages/
 
-# Build outputs
+# Build and Distribution Outputs
 dist/
+**/dist/
 build/
+**/build/
+out/
 *.dist
+*.bundle.*
+.next/
+.nuxt/
+.out/
+.storybook-out/
 
-# Environment variables
+# Environment Variables and Secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.test.example
+*.local
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-logs
+# Logs and Diagnostics
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -39,76 +41,71 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Runtime data
-pids
+# Runtime Data and PIDs
+pids/
 *.pid
 *.seed
 *.pid.lock
 *.bak
 
-# Coverage directory used by tools like istanbul
+# Test and Coverage
 coverage/
 *.lcov
+.nyc_output/
+.vitest/
 
-# nyc test coverage
-.nyc_output
+# IDE, Editor, and Tool Caches
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
 
-# Dependency directories
-jspm_packages/
-
-# TypeScript cache
+# TypeScript / Bundler Caches
 *.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
+.cache/
+.parcel-cache/
 .eslintcache
-
-# Microbundle cache
+.stylelintcache
+.prettiercache
 .rpt2_cache/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/
-
-# Optional REPL history
 .node_repl_history
 
-# Output of 'npm pack'
+# Packaging and Archive Outputs
 *.tgz
-
-# Yarn Integrity file
+*.tar.gz
+*.zip
+*.7z
 .yarn-integrity
 
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
-.cache/
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# Database
+# Databases and Local Storage
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
+*.sqlite3-journal
 
-# Manus version file (auto-generated, not part of source)
+# Webdev / Manus System Artifacts
+.webdev/
 client/public/__manus__/version.json
 .project-config.json
-.git-bin/
-.git-portable.zip
 
+# Temporary and Scratch Dirs
+tmp/
+temp/
+scratch/
