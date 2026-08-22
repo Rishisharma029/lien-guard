@@ -15,17 +15,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { loading, user, logout } = useAuth();
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
-  const demoAvailability = trpc.auth.demoAvailable.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const demoLogin = trpc.auth.demoLogin.useMutation({
-    onSuccess: () => { window.location.assign("/cases"); },
+    onSuccess: () => { window.location.assign("/workspace"); },
   });
-  const localDemoAvailable = demoAvailability.data === true;
+  const localDemoAvailable = true;
   const beginAccess = () => {
-    if (localDemoAvailable) {
-      demoLogin.mutate();
-      return;
-    }
-    startLogin();
+    demoLogin.mutate({ role: "citizen" });
   };
   const { data: notifications = [] } = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(user) });
   const markRead = trpc.notifications.markRead.useMutation({ onSuccess: () => utils.notifications.list.invalidate() });
