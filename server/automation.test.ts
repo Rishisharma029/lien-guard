@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDeadlineFollowUp, deadlineActionKey } from "./automation";
 import { isValidEmailAddress } from "./maileroo";
-import { getEmailDeliveryBlockReason, isEmailRecipientAllowedForDelivery } from "./_core/env";
+import { createEmailDeliveryGuard } from "./_core/env";
 
 describe("Maileroo communication safeguards", () => {
   it("accepts ordinary email addresses but rejects control characters and malformed recipients", () => {
@@ -11,8 +11,15 @@ describe("Maileroo communication safeguards", () => {
   });
 
   it("defaults to denying external delivery when no live or demo mode is configured", () => {
-    expect(isEmailRecipientAllowedForDelivery("authority@example.org")).toBe(false);
-    expect(getEmailDeliveryBlockReason("authority@example.org")).toContain("disabled");
+    const guard = createEmailDeliveryGuard("", "");
+    expect(guard.isRecipientAllowed("authority@example.org")).toBe(false);
+    expect(guard.blockReason("authority@example.org")).toContain("disabled");
+  });
+
+  it("permits only the explicit recipient in demo mode", () => {
+    const guard = createEmailDeliveryGuard("demo", "controlled@example.org");
+    expect(guard.isRecipientAllowed("controlled@example.org")).toBe(true);
+    expect(guard.isRecipientAllowed("other@example.org")).toBe(false);
   });
 
   it("builds a traceable deadline follow-up with a stable idempotency key", () => {

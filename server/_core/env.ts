@@ -16,6 +16,25 @@ function parseDemoRecipients(value: string) {
   );
 }
 
+export function createEmailDeliveryGuard(modeValue: string, recipientsValue: string) {
+  const mode = parseEmailDeliveryMode(modeValue.trim().toLowerCase());
+  const recipients = parseDemoRecipients(recipientsValue);
+  return {
+    mode,
+    recipients,
+    isRecipientAllowed(recipient: string) {
+      if (mode === "live") return true;
+      if (mode !== "demo") return false;
+      return recipients.has(recipient.trim().toLowerCase());
+    },
+    blockReason(recipient: string) {
+      if (mode === "disabled") return "Email delivery is disabled for this environment.";
+      if (mode === "demo") return `Demo delivery is limited to the configured controlled-recipient allowlist; ${recipient} is not permitted.`;
+      return "";
+    },
+  };
+}
+
 /**
  * Central runtime configuration. Secrets are intentionally read only here and
  * never exposed through the tRPC contract or client bundle.
@@ -42,6 +61,11 @@ export const ENV = {
   demoEmailRecipients: parseDemoRecipients(optional("DEMO_EMAIL_RECIPIENTS")),
 };
 
+const emailDeliveryGuard = createEmailDeliveryGuard(
+  optional("EMAIL_DELIVERY_MODE"),
+  optional("DEMO_EMAIL_RECIPIENTS"),
+);
+
 export function isMailerooConfigured() {
   return Boolean(
     ENV.mailerooSmtpHost &&
@@ -58,13 +82,9 @@ export function isMailerooConfigured() {
  * explicit controlled-recipient allowlist; live mode is intentional and broad.
  */
 export function isEmailRecipientAllowedForDelivery(recipient: string) {
-  if (ENV.emailDeliveryMode === "live") return true;
-  if (ENV.emailDeliveryMode !== "demo") return false;
-  return ENV.demoEmailRecipients.has(recipient.trim().toLowerCase());
+  return emailDeliveryGuard.isRecipientAllowed(recipient);
 }
 
 export function getEmailDeliveryBlockReason(recipient: string) {
-  if (ENV.emailDeliveryMode === "disabled") return "Email delivery is disabled for this environment.";
-  if (ENV.emailDeliveryMode === "demo") return `Demo delivery is limited to the configured controlled-recipient allowlist; ${recipient} is not permitted.`;
-  return "";
+  return emailDeliveryGuard.blockReason(recipient);
 }
