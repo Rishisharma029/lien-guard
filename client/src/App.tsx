@@ -17,6 +17,7 @@ const Home = lazy(() => import("@/pages/Home"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Workspace = lazy(() => import("@/pages/Workspace"));
 const RtiAssistant = lazy(() => import("@/pages/RtiAssistant"));
+const StaticPreview = lazy(() => import("@/pages/StaticPreview"));
 const Timeline = lazy(() => import("@/pages/Timeline"));
 
 function PageLoading() {
@@ -52,6 +53,7 @@ function Router() {
     <Suspense fallback={<PageLoading />}>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/preview" component={StaticPreview} />
         <Route path="/workspace" component={WorkspaceRoute} />
         <Route path="/cases" component={CasesRoute} />
         <Route path="/cases/:caseId" component={CaseDetailRoute} />
