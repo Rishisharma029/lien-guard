@@ -1,8 +1,12 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  Case,
+  CasePriority,
+  CaseStatus,
   InsertUser,
   LienGuardRole,
+  cases,
   roleChangeAudits,
   userNotifications,
   users,
@@ -183,4 +187,66 @@ export async function getRoleChangeAudits() {
   if (!db) return [];
 
   return db.select().from(roleChangeAudits).orderBy(desc(roleChangeAudits.createdAt)).limit(100);
+}
+
+export function createCaseReference() {
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `LG-${new Date().getFullYear()}-${suffix}`;
+}
+
+export async function listCasesForUser(user: { id: number; role: LienGuardRole }) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const query = db.select().from(cases);
+  if (user.role === "citizen") {
+    return query.where(eq(cases.userId, user.id)).orderBy(desc(cases.updatedAt));
+  }
+  return query.orderBy(desc(cases.updatedAt));
+}
+
+export async function getCaseByReference(caseId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(cases).where(eq(cases.caseId, caseId)).limit(1);
+  return result[0];
+}
+
+export async function createCase(input: {
+  userId: number;
+  title: string;
+  description: string;
+  caseType: string;
+  priority: CasePriority;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const caseId = createCaseReference();
+  await db.insert(cases).values({ ...input, caseId, status: "OPEN" });
+  return getCaseByReference(caseId);
+}
+
+export async function setCaseStatus(caseId: string, status: CaseStatus): Promise<Case | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  await db.update(cases).set({ status }).where(eq(cases.caseId, caseId));
+  return getCaseByReference(caseId);
+}
+
+export async function updateCaseDetails(input: {
+  caseId: string;
+  title?: string;
+  description?: string;
+  caseType?: string;
+  priority?: CasePriority;
+}): Promise<Case | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const { caseId, ...values } = input;
+  await db.update(cases).set(values).where(eq(cases.caseId, caseId));
+  return getCaseByReference(caseId);
 }

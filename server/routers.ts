@@ -1,12 +1,18 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { userRoles } from "../drizzle/schema";
+import { casePriorities, caseStatuses, userRoles } from "../drizzle/schema";
+import { canAccessCase, canUpdateCaseDetails, canUpdateCaseStatus, isCaseStatusTransitionAllowed } from "./cases";
 import {
   changeUserRoleWithAudit,
+  createCase,
+  getCaseByReference,
   getNotificationsForUser,
   getRoleChangeAudits,
+  listCasesForUser,
   listUsersForAdmin,
   markNotificationRead,
+  setCaseStatus,
+  updateCaseDetails,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -68,6 +74,71 @@ export const appRouter = router({
     markRead: protectedProcedure
       .input(z.object({ notificationId: z.number().int().positive() }))
       .mutation(({ ctx, input }) => markNotificationRead(input.notificationId, ctx.user.id)),
+  }),
+  cases: router({
+    list: protectedProcedure.query(({ ctx }) => listCasesForUser(ctx.user)),
+    get: protectedProcedure
+      .input(z.object({ caseId: z.string().min(4).max(32) }))
+      .query(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!canAccessCase(ctx.user.role, ctx.user.id, caseRecord.userId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this case." });
+        }
+        return caseRecord;
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        title: z.string().trim().min(4).max(180),
+        description: z.string().trim().min(10).max(5000),
+        caseType: z.string().trim().min(2).max(80),
+        priority: z.enum(casePriorities).default("NORMAL"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const created = await createCase({ userId: ctx.user.id, ...input });
+        if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Case could not be created." });
+        return created;
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        caseId: z.string().min(4).max(32),
+        title: z.string().trim().min(4).max(180).optional(),
+        description: z.string().trim().min(10).max(5000).optional(),
+        caseType: z.string().trim().min(2).max(80).optional(),
+        priority: z.enum(casePriorities).optional(),
+      }).refine(input => Object.keys(input).some(key => key !== "caseId"), {
+        message: "Provide at least one case field to update.",
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const current = await getCaseByReference(input.caseId);
+        if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!canUpdateCaseDetails({
+          role: ctx.user.role,
+          currentUserId: ctx.user.id,
+          caseOwnerId: current.userId,
+          status: current.status,
+        })) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission to update this case." });
+        }
+        const updated = await updateCaseDetails(input);
+        if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Case could not be updated." });
+        return updated;
+      }),
+    updateStatus: protectedProcedure
+      .input(z.object({ caseId: z.string().min(4).max(32), status: z.enum(caseStatuses) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!canUpdateCaseStatus(ctx.user.role)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only authorities and administrators can update case status." });
+        }
+        const current = await getCaseByReference(input.caseId);
+        if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!isCaseStatusTransitionAllowed(current.status, input.status)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This case has reached a terminal status and cannot be reopened." });
+        }
+        const updated = await setCaseStatus(input.caseId, input.status);
+        if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Case status could not be updated." });
+        return updated;
+      }),
   }),
   users: router({
     list: adminProcedure.query(() => listUsersForAdmin()),

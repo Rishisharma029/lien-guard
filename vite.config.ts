@@ -170,6 +170,9 @@ export default defineConfig({
   },
   server: {
     host: true,
+    // The managed preview proxy does not expose Vite's direct websocket
+    // transport consistently. Full-page reloads keep the preview reliable.
+    hmr: false,
     allowedHosts: [
       ".manuspre.computer",
       ".manus.computer",

@@ -15,3 +15,30 @@
 - [x] Run the production build and resolve any build-time issues.
 - [x] Verify unauthenticated and non-administrator protected-access states.
 - [x] Verify administrator-only API and user-interface access with an authenticated non-administrator identity.
+- [x] Diagnose and fix the project preview loading failure.
+- [x] Eliminate the remaining Vite websocket preview error and verify it does not recur after restart.
+- [x] Re-test the preview end to end for stable rendering and navigation after the websocket fix.
+- [x] Verify successful post-fix preview requests across the landing, workspace, and administrator routes.
+- [x] Verify route transitions remain stable after the websocket fix.
+- [x] Verify live in-app navigation after the websocket fix without triggering a user sign-in flow.
+- [x] Add the Case entity with identifiers, ownership, lifecycle fields, and timestamps.
+- [x] Implement database-backed protected procedures for creating, listing, viewing, and updating cases.
+- [x] Apply and verify the Case Management database migration.
+- [x] Add a protected case update mutation for validated editable case fields with ownership and role checks.
+- [x] Add automated tests for authorized and forbidden case field updates.
+- [x] Add tRPC-level tests for authorized Case field updates, forbidden callers, and empty update validation.
+- [x] Create a role-aware Case Management workspace with case status, priority, and lifecycle controls.
+- [x] Add a Case Management list-query error state with a retry action.
+- [x] Re-validate the Case Management preview after adding loading-failure handling.
+- [x] Exercise and verify the Case Management list failure and retry recovery path in the browser.
+- [x] Verify the simulated Case Management error card in a live browser session.
+- [x] Exercise the Case Management retry action in-browser and verify normal recovery.
+- [x] Add automated tests for case access and lifecycle state updates.
+- [x] Validate the Case Management build, tests, and preview presentation.
+- [x] Verify client-side in-app navigation without entering the OAuth sign-in flow.
+- [x] Add tRPC tests for Case lifecycle updates and case-access ownership enforcement.
+- [x] Verify the authenticated Case Management error card and retry action in a live browser session.
+- [x] Capture inspectable authenticated Case Management preview evidence after final validation.
+- [x] Copy the completed LienGuard project source to the connected local LienGuard folder.
+- [ ] Create a new private GitHub repository for the completed LienGuard source.
+- [ ] Push the latest project source to the new private GitHub repository and verify the result.

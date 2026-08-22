@@ -7,7 +7,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, Si
 import { startLogin } from "@/const";
 import { isAdministrator } from "@/lib/roleAccess";
 import { trpc } from "@/lib/trpc";
-import { Bell, Building2, ChevronRight, LayoutDashboard, LogOut, PanelLeft, ShieldCheck, Users } from "lucide-react";
+import { Bell, Building2, ChevronRight, FolderKanban, LayoutDashboard, LogOut, PanelLeft, ShieldCheck, Users } from "lucide-react";
 import { useLocation } from "wouter";
 
 const roleName = { citizen: "Citizen", bank: "Bank", authority: "Authority", admin: "Administrator" } as const;
@@ -51,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navItems = [
     { label: "Workspace", icon: LayoutDashboard, href: "/workspace" },
+    { label: "Case register", icon: FolderKanban, href: "/cases" },
     ...(isAdministrator(user.role) ? [{ label: "User access", icon: Users, href: "/admin/users" }] : []),
   ];
   const unreadCount = notifications.filter(notification => !notification.readAt).length;

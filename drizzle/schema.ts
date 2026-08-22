@@ -2,6 +2,10 @@ import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "dri
 
 export const userRoles = ["citizen", "bank", "authority", "admin"] as const;
 export type LienGuardRole = (typeof userRoles)[number];
+export const caseStatuses = ["OPEN", "UNDER_REVIEW", "AWAITING_RESPONSE", "ESCALATED", "RESOLVED", "CLOSED"] as const;
+export const casePriorities = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
+export type CaseStatus = (typeof caseStatuses)[number];
+export type CasePriority = (typeof casePriorities)[number];
 
 /** Core user record created and refreshed by the Manus OAuth flow. */
 export const users = mysqlTable("users", {
@@ -30,6 +34,26 @@ export const userNotifications = mysqlTable(
   table => [index("user_notifications_user_created_idx").on(table.userId, table.createdAt)],
 );
 
+export const cases = mysqlTable(
+  "cases",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caseId: varchar("case_id", { length: 32 }).notNull().unique(),
+    userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 180 }).notNull(),
+    description: text("description").notNull(),
+    caseType: varchar("case_type", { length: 80 }).notNull(),
+    status: mysqlEnum("status", caseStatuses).default("OPEN").notNull(),
+    priority: mysqlEnum("priority", casePriorities).default("NORMAL").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("cases_user_updated_idx").on(table.userId, table.updatedAt),
+    index("cases_status_updated_idx").on(table.status, table.updatedAt),
+  ],
+);
+
 export const roleChangeAudits = mysqlTable(
   "role_change_audits",
   {
@@ -50,3 +74,4 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type RoleChangeAudit = typeof roleChangeAudits.$inferSelect;
+export type Case = typeof cases.$inferSelect;
