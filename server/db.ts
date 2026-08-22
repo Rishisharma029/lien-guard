@@ -1,7 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { randomUUID } from "node:crypto";
 import {
+  AutomationActionType,
   Case,
   CaseCommunication,
   CaseDocument,
@@ -12,6 +13,7 @@ import {
   CaseStatus,
   InsertUser,
   LienGuardRole,
+  caseAutomationActions,
   caseCommunications,
   caseDocuments,
   caseEvents,
@@ -267,6 +269,27 @@ export async function createCase(input: {
   throw new Error("Could not allocate a unique case reference");
 }
 
+export async function recordSystemCaseEvent(input: {
+  caseRecordId: number;
+  type: CaseEventType;
+  message: string;
+  previousStatus?: CaseStatus | null;
+  nextStatus?: CaseStatus | null;
+  actorLabel?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db.insert(caseEvents).values({
+    caseId: input.caseRecordId,
+    actorUserId: null,
+    actorLabel: input.actorLabel || "LienGuard automation",
+    type: input.type,
+    message: input.message,
+    previousStatus: input.previousStatus || null,
+    nextStatus: input.nextStatus || null,
+  });
+}
+
 export async function listCaseEvents(caseRecordId: number): Promise<CaseEvent[]> {
   const db = await getDb();
   if (!db) return [];
@@ -344,6 +367,241 @@ export async function listCaseCommunications(caseRecordId: number): Promise<Case
   const db = await getDb();
   if (!db) return [];
   return db.select().from(caseCommunications).where(eq(caseCommunications.caseId, caseRecordId)).orderBy(desc(caseCommunications.createdAt));
+}
+
+export async function createOutboundEmail(input: {
+  caseRecordId: number;
+  actorUserId: number | null;
+  actorLabel?: string;
+  subject: string;
+  body: string;
+  recipientName?: string | null;
+  recipientEmail: string;
+  automated?: boolean;
+  eventType?: CaseEventType;
+  eventMessage?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const communicationResult = await db.transaction(async tx => {
+    const insert = await tx.insert(caseCommunications).values({
+      caseId: input.caseRecordId,
+      direction: "outbound",
+      subject: input.subject,
+      counterparty: input.recipientName || null,
+      recipientEmail: input.recipientEmail,
+      body: input.body,
+      state: "queued",
+      automated: input.automated ? 1 : 0,
+    });
+    const communicationId = Number(insert[0].insertId);
+    await tx.insert(caseEvents).values({
+      caseId: input.caseRecordId,
+      actorUserId: input.actorUserId,
+      actorLabel: input.actorLabel || null,
+      type: input.eventType ?? "EMAIL_QUEUED",
+      message: input.eventMessage ?? `Email queued for delivery to ${input.recipientEmail}.`,
+    });
+    return communicationId;
+  });
+
+  return getCaseCommunicationById(communicationResult);
+}
+
+export async function getCaseCommunicationById(communicationId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(caseCommunications).where(eq(caseCommunications.id, communicationId)).limit(1);
+  return result[0];
+}
+
+export async function markOutboundEmailSent(input: { communicationId: number; providerMessageId: string; actorLabel?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const communication = await getCaseCommunicationById(input.communicationId);
+  if (!communication || communication.state !== "queued") return undefined;
+
+  await db.transaction(async tx => {
+    await tx.update(caseCommunications).set({ state: "sent", providerMessageId: input.providerMessageId, sentAt: new Date() }).where(eq(caseCommunications.id, input.communicationId));
+    await tx.insert(caseEvents).values({
+      caseId: communication.caseId,
+      actorUserId: null,
+      actorLabel: input.actorLabel || "LienGuard Maileroo delivery",
+      type: "EMAIL_SENT",
+      message: `Email accepted by the delivery provider for ${communication.recipientEmail || "the intended recipient"}.`,
+    });
+  });
+  return getCaseCommunicationById(input.communicationId);
+}
+
+export async function markOutboundEmailFailed(input: { communicationId: number; message: string; actorLabel?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const communication = await getCaseCommunicationById(input.communicationId);
+  if (!communication || communication.state !== "queued") return undefined;
+
+  await db.transaction(async tx => {
+    await tx.update(caseCommunications).set({ state: "failed" }).where(eq(caseCommunications.id, input.communicationId));
+    await tx.insert(caseEvents).values({
+      caseId: communication.caseId,
+      actorUserId: null,
+      actorLabel: input.actorLabel || "LienGuard Maileroo delivery",
+      type: "EMAIL_FAILED",
+      message: `Email delivery could not be completed: ${input.message.slice(0, 380)}.`,
+    });
+  });
+  return getCaseCommunicationById(input.communicationId);
+}
+
+export async function recordInboundEmail(input: {
+  caseRecordId: number;
+  providerMessageId: string;
+  senderEmail: string;
+  subject: string;
+  body: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const existing = await db.select().from(caseCommunications).where(eq(caseCommunications.providerMessageId, input.providerMessageId)).limit(1);
+  if (existing[0]) return { communication: existing[0], duplicate: true };
+
+  try {
+    const communicationId = await db.transaction(async tx => {
+      const insert = await tx.insert(caseCommunications).values({
+        caseId: input.caseRecordId,
+        direction: "inbound",
+        subject: input.subject,
+        counterparty: input.senderEmail,
+        recipientEmail: input.senderEmail,
+        body: input.body,
+        state: "received",
+        providerMessageId: input.providerMessageId,
+      });
+      const id = Number(insert[0].insertId);
+      await tx.insert(caseEvents).values({
+        caseId: input.caseRecordId,
+        actorUserId: null,
+        actorLabel: "Maileroo inbound routing",
+        type: "INBOUND_EMAIL_RECEIVED",
+        message: `Inbound email received from ${input.senderEmail}.`,
+      });
+      return id;
+    });
+    const communication = await getCaseCommunicationById(communicationId);
+    if (!communication) throw new Error("Inbound communication could not be saved");
+    return { communication, duplicate: false };
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      const duplicate = await db.select().from(caseCommunications).where(eq(caseCommunications.providerMessageId, input.providerMessageId)).limit(1);
+      if (duplicate[0]) return { communication: duplicate[0], duplicate: true };
+    }
+    throw error;
+  }
+}
+
+export async function listQueuedOutboundEmails(limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(caseCommunications).where(and(eq(caseCommunications.direction, "outbound"), eq(caseCommunications.state, "queued"))).orderBy(desc(caseCommunications.createdAt)).limit(limit);
+}
+
+export async function createDeadlineFollowUpIfAbsent(input: {
+  caseRecord: Case;
+  idempotencyKey: string;
+  subject: string;
+  body: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  if (!input.caseRecord.authorityEmail) throw new Error("The case has no authority email address.");
+
+  try {
+    const result = await db.transaction(async tx => {
+      const communicationInsert = await tx.insert(caseCommunications).values({
+        caseId: input.caseRecord.id,
+        direction: "outbound",
+        subject: input.subject,
+        counterparty: input.caseRecord.authorityName || null,
+        recipientEmail: input.caseRecord.authorityEmail,
+        body: input.body,
+        state: "queued",
+        automated: 1,
+      });
+      const communicationId = Number(communicationInsert[0].insertId);
+      await tx.insert(caseAutomationActions).values({
+        caseId: input.caseRecord.id,
+        action: "DEADLINE_FOLLOW_UP",
+        idempotencyKey: input.idempotencyKey,
+        communicationId,
+      });
+      await tx.insert(caseEvents).values({
+        caseId: input.caseRecord.id,
+        actorUserId: null,
+        actorLabel: "LienGuard deadline automation",
+        type: "DEADLINE_FOLLOW_UP_QUEUED",
+        message: `Deadline follow-up queued for delivery to ${input.caseRecord.authorityEmail}.`,
+      });
+      return communicationId;
+    });
+    return { created: true, communication: await getCaseCommunicationById(result) };
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return { created: false, communication: undefined };
+    throw error;
+  }
+}
+
+export async function recordDeadlineAutomationAction(input: {
+  caseRecordId: number;
+  action: AutomationActionType;
+  idempotencyKey: string;
+  communicationId?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  try {
+    const result = await db.insert(caseAutomationActions).values({
+      caseId: input.caseRecordId,
+      action: input.action,
+      idempotencyKey: input.idempotencyKey,
+      communicationId: input.communicationId || null,
+    });
+    return { created: true, id: Number(result[0].insertId) };
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return { created: false, id: null };
+    throw error;
+  }
+}
+
+export async function listOverdueAwaitingResponseCases(now: Date) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(cases).where(and(eq(cases.status, "AWAITING_RESPONSE"), lte(cases.responseDeadline, now))).orderBy(desc(cases.responseDeadline));
+}
+
+export async function escalateCaseForDeadline(input: { caseRecordId: number; previousStatus: CaseStatus; message: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const current = await db.select().from(cases).where(eq(cases.id, input.caseRecordId)).limit(1);
+  const caseRecord = current[0];
+  if (!caseRecord || caseRecord.status !== input.previousStatus) return undefined;
+
+  await db.transaction(async tx => {
+    const update = await tx.update(cases).set({ status: "ESCALATED" }).where(and(eq(cases.id, input.caseRecordId), eq(cases.status, input.previousStatus)));
+    if (!Number(update[0].affectedRows)) return;
+    await tx.insert(caseEvents).values({
+      caseId: input.caseRecordId,
+      actorUserId: null,
+      actorLabel: "LienGuard deadline automation",
+      type: "DEADLINE_ESCALATED",
+      message: input.message,
+      previousStatus: input.previousStatus,
+      nextStatus: "ESCALATED",
+    });
+  });
+  const refreshed = await db.select().from(cases).where(eq(cases.id, input.caseRecordId)).limit(1);
+  return refreshed[0];
 }
 
 export async function recordCaseFollowUp(input: {

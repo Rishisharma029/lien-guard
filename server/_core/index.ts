@@ -5,6 +5,8 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerMailerooWebhook } from "../mailerooWebhook";
+import { registerScheduledRoutes } from "../scheduled";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -45,6 +47,9 @@ async function startServer() {
     }
     next();
   });
+  // Maileroo webhooks register their own 256 KB JSON parser before this broader
+  // document-upload parser so inbound mail events cannot consume upload-sized bodies.
+  registerMailerooWebhook(app);
   // A 10 MB document plus base64 transport overhead fits safely below 15 MB.
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ limit: "15mb", extended: true }));
@@ -53,6 +58,7 @@ async function startServer() {
     next();
   });
   registerStorageProxy(app);
+  registerScheduledRoutes(app);
   registerOAuthRoutes(app);
   // tRPC API
   app.use(

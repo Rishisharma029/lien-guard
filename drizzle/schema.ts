@@ -4,12 +4,29 @@ export const userRoles = ["citizen", "bank", "authority", "admin"] as const;
 export type LienGuardRole = (typeof userRoles)[number];
 export const caseStatuses = ["OPEN", "UNDER_REVIEW", "AWAITING_RESPONSE", "ESCALATED", "RESOLVED", "CLOSED"] as const;
 export const casePriorities = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
-export const caseEventTypes = ["CASE_CREATED", "DETAILS_UPDATED", "STATUS_CHANGED", "COMMUNICATION_RECORDED", "DOCUMENT_UPLOADED", "RTI_DRAFT_CREATED"] as const;
+export const caseEventTypes = [
+  "CASE_CREATED",
+  "DETAILS_UPDATED",
+  "STATUS_CHANGED",
+  "COMMUNICATION_RECORDED",
+  "EMAIL_QUEUED",
+  "EMAIL_SENT",
+  "EMAIL_FAILED",
+  "INBOUND_EMAIL_RECEIVED",
+  "DEADLINE_FOLLOW_UP_QUEUED",
+  "DEADLINE_ESCALATED",
+  "DOCUMENT_UPLOADED",
+  "RTI_DRAFT_CREATED",
+] as const;
 export const caseDocumentKinds = ["EVIDENCE", "CORRESPONDENCE", "RTI_DRAFT", "OTHER"] as const;
+export const communicationStates = ["recorded", "queued", "sent", "failed", "received"] as const;
+export const automationActionTypes = ["DEADLINE_FOLLOW_UP", "DEADLINE_ESCALATION"] as const;
 export type CaseStatus = (typeof caseStatuses)[number];
 export type CasePriority = (typeof casePriorities)[number];
 export type CaseEventType = (typeof caseEventTypes)[number];
 export type CaseDocumentKind = (typeof caseDocumentKinds)[number];
+export type CommunicationState = (typeof communicationStates)[number];
+export type AutomationActionType = (typeof automationActionTypes)[number];
 
 /** Core user record created and refreshed by the Manus OAuth flow. */
 export const users = mysqlTable("users", {
@@ -53,6 +70,7 @@ export const cases = mysqlTable(
     lienReference: varchar("lien_reference", { length: 96 }),
     transactionReference: varchar("transaction_reference", { length: 96 }),
     authorityName: varchar("authority_name", { length: 160 }),
+    authorityEmail: varchar("authority_email", { length: 320 }),
     responseDeadline: timestamp("response_deadline"),
     status: mysqlEnum("status", caseStatuses).default("OPEN").notNull(),
     priority: mysqlEnum("priority", casePriorities).default("NORMAL").notNull(),
@@ -73,8 +91,12 @@ export const caseCommunications = mysqlTable(
     direction: mysqlEnum("direction", ["outbound", "inbound"]).notNull(),
     subject: varchar("subject", { length: 180 }).notNull(),
     counterparty: varchar("counterparty", { length: 160 }),
+    recipientEmail: varchar("recipient_email", { length: 320 }),
     body: text("body").notNull(),
-    state: mysqlEnum("state", ["recorded", "received"]).default("recorded").notNull(),
+    state: mysqlEnum("state", communicationStates).default("recorded").notNull(),
+    providerMessageId: varchar("provider_message_id", { length: 128 }).unique(),
+    automated: int("automated").default(0).notNull(),
+    sentAt: timestamp("sent_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   table => [index("case_communications_case_created_idx").on(table.caseId, table.createdAt)],
@@ -86,7 +108,8 @@ export const caseEvents = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     caseId: int("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
-    actorUserId: int("actor_user_id").notNull().references(() => users.id),
+    actorUserId: int("actor_user_id").references(() => users.id),
+    actorLabel: varchar("actor_label", { length: 96 }),
     type: mysqlEnum("type", caseEventTypes).notNull(),
     message: varchar("message", { length: 500 }).notNull(),
     previousStatus: mysqlEnum("previous_status", caseStatuses),
@@ -113,6 +136,19 @@ export const caseDocuments = mysqlTable(
   table => [index("case_documents_case_created_idx").on(table.caseId, table.createdAt)],
 );
 
+export const caseAutomationActions = mysqlTable(
+  "case_automation_actions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caseId: int("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+    action: mysqlEnum("action", automationActionTypes).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull().unique(),
+    communicationId: int("communication_id").references(() => caseCommunications.id, { onDelete: "set null" }),
+    completedAt: timestamp("completed_at").defaultNow().notNull(),
+  },
+  table => [index("case_automation_case_action_idx").on(table.caseId, table.action, table.completedAt)],
+);
+
 export const roleChangeAudits = mysqlTable(
   "role_change_audits",
   {
@@ -137,3 +173,4 @@ export type Case = typeof cases.$inferSelect;
 export type CaseCommunication = typeof caseCommunications.$inferSelect;
 export type CaseEvent = typeof caseEvents.$inferSelect;
 export type CaseDocument = typeof caseDocuments.$inferSelect;
+export type CaseAutomationAction = typeof caseAutomationActions.$inferSelect;

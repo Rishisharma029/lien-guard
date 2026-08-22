@@ -1,0 +1,30 @@
+name: Deadline automation
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  process-deadlines:
+    name: Process overdue case deadlines
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ secrets.LIENGUARD_APP_URL }}
+      AUTOMATION_SECRET: ${{ secrets.LIENGUARD_AUTOMATION_SECRET }}
+    steps:
+      - name: Call the protected Lien Guard deadline endpoint
+        if: ${{ env.APP_URL != '' && env.AUTOMATION_SECRET != '' }}
+        run: |
+          curl --fail --silent --show-error --retry 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 60 \
+            -X POST "${APP_URL%/}/api/scheduled/deadline-automation" \
+            -H "Authorization: Bearer ${AUTOMATION_SECRET}" \
+            -H "Accept: application/json"
+
+      - name: Explain skipped configuration
+        if: ${{ env.APP_URL == '' || env.AUTOMATION_SECRET == '' }}
+        run: echo "Deadline automation is intentionally inactive until LIENGUARD_APP_URL and LIENGUARD_AUTOMATION_SECRET are stored as repository secrets."

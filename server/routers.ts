@@ -6,6 +6,7 @@ import {
   changeUserRoleWithAudit,
   createCase,
   createCaseDocument,
+  createOutboundEmail,
   getCaseByReference,
   getNotificationsForUser,
   getRoleChangeAudits,
@@ -20,6 +21,8 @@ import {
   updateCaseDetails,
 } from "./db";
 import { decodeCaseDocument } from "./documents";
+import { deliverQueuedCommunication } from "./automation";
+import { isValidEmailAddress } from "./maileroo";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -53,6 +56,7 @@ const createCaseInput = z.object({
   lienReference: z.string().trim().min(2).max(96).optional(),
   transactionReference: z.string().trim().min(2).max(96).optional(),
   authorityName: z.string().trim().min(2).max(160).optional(),
+  authorityEmail: z.string().trim().email("Enter a valid authority email address.").max(320).optional(),
   responseDeadline: optionalDate,
 });
 
@@ -68,6 +72,7 @@ const updateCaseInput = z.object({
   lienReference: optionalNullableText(2, 96),
   transactionReference: optionalNullableText(2, 96),
   authorityName: optionalNullableText(2, 160),
+  authorityEmail: z.string().trim().email("Enter a valid authority email address.").max(320).nullable().optional(),
   responseDeadline: optionalNullableDate,
 }).superRefine((input, context) => {
   const hasField = Object.entries(input).some(([key, value]) => key !== "caseId" && value !== undefined);
@@ -82,11 +87,8 @@ function requireCaseAccess(user: { id: number; role: (typeof userRoles)[number] 
   }
 }
 
-function rtiReason(caseRecord: { status: (typeof caseStatuses)[number]; responseDeadline: Date | null }) {
+function rtiReason(caseRecord: { status: (typeof caseStatuses)[number] }) {
   if (caseRecord.status === "ESCALATED") return "The case has been marked escalated in its recorded lifecycle.";
-  if (caseRecord.status === "AWAITING_RESPONSE" && caseRecord.responseDeadline && caseRecord.responseDeadline.getTime() < Date.now()) {
-    return "The recorded response deadline has passed while the case remains awaiting response.";
-  }
   return null;
 }
 
@@ -227,6 +229,34 @@ export const appRouter = router({
         const entry = await recordCaseFollowUp({ caseRecordId: caseRecord.id, actorUserId: ctx.user.id, authorityName: caseRecord.authorityName, note: input.note });
         if (!entry) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Follow-up could not be recorded." });
         return entry;
+      }),
+    sendToAuthority: protectedProcedure
+      .input(z.object({
+        caseId: z.string().trim().min(4).max(32),
+        subject: z.string().trim().min(4).max(180),
+        body: z.string().trim().min(10).max(8_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!canUpdateCaseDetails({ role: ctx.user.role, currentUserId: ctx.user.id, caseOwnerId: caseRecord.userId, status: caseRecord.status })) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission to send case correspondence." });
+        }
+        if (!caseRecord.authorityEmail || !isValidEmailAddress(caseRecord.authorityEmail)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Record a valid authority email address before sending correspondence." });
+        }
+        const queued = await createOutboundEmail({
+          caseRecordId: caseRecord.id,
+          actorUserId: ctx.user.id,
+          subject: input.subject.includes(caseRecord.caseId) ? input.subject : `[${caseRecord.caseId}] ${input.subject}`,
+          body: input.body,
+          recipientName: caseRecord.authorityName,
+          recipientEmail: caseRecord.authorityEmail,
+          eventMessage: `Case email queued for ${caseRecord.authorityEmail}.`,
+        });
+        if (!queued) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Email could not be queued." });
+        const delivery = await deliverQueuedCommunication(queued);
+        return { communicationId: queued.id, delivery };
       }),
   }),
   documents: router({

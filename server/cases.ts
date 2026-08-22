@@ -73,17 +73,32 @@ function titleForEvent(event: CaseEvent) {
       return "Lifecycle status changed";
     case "COMMUNICATION_RECORDED":
       return "Communication recorded";
+    case "EMAIL_QUEUED":
+      return "Email queued";
+    case "EMAIL_SENT":
+      return "Email sent";
+    case "EMAIL_FAILED":
+      return "Email delivery needs attention";
+    case "INBOUND_EMAIL_RECEIVED":
+      return "Inbound email received";
+    case "DEADLINE_FOLLOW_UP_QUEUED":
+      return "Deadline follow-up queued";
+    case "DEADLINE_ESCALATED":
+      return "Deadline escalation triggered";
     case "DOCUMENT_UPLOADED":
       return "Document added";
     case "RTI_DRAFT_CREATED":
       return "RTI draft prepared";
+    default:
+      return "Case activity recorded";
   }
 }
 
 function toneForEvent(event: CaseEvent): CaseTimelineEvent["tone"] {
-  if (event.nextStatus === "ESCALATED") return "danger";
-  if (event.nextStatus === "RESOLVED" || event.nextStatus === "CLOSED") return "success";
-  if (event.type === "CASE_CREATED" || event.type === "STATUS_CHANGED") return "active";
+  if (event.nextStatus === "ESCALATED" || event.type === "DEADLINE_ESCALATED" || event.type === "EMAIL_FAILED") return "danger";
+  if (event.nextStatus === "RESOLVED" || event.nextStatus === "CLOSED" || event.type === "EMAIL_SENT") return "success";
+  if (event.type === "CASE_CREATED" || event.type === "STATUS_CHANGED" || event.type === "EMAIL_QUEUED" || event.type === "DEADLINE_FOLLOW_UP_QUEUED") return "active";
+  if (event.type === "INBOUND_EMAIL_RECEIVED") return "warning";
   return "neutral";
 }
 

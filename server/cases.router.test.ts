@@ -10,11 +10,14 @@ const caseState = vi.hoisted(() => ({
     caseType: "Lien review",
     status: "OPEN" as "OPEN" | "UNDER_REVIEW" | "AWAITING_RESPONSE" | "ESCALATED" | "RESOLVED" | "CLOSED",
     priority: "NORMAL" as const,
+    authorityName: "Test Authority",
+    authorityEmail: "authority@example.com",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   updateCaseDetails: vi.fn(),
   setCaseStatus: vi.fn(),
+  createOutboundEmail: vi.fn(async () => ({ id: 7, state: "queued" })),
   listCaseCommunications: vi.fn(async () => []),
   listCaseEvents: vi.fn(async () => []),
   listCaseDocuments: vi.fn(async () => []),
@@ -25,6 +28,7 @@ vi.mock("./db", () => ({
   changeUserRoleWithAudit: vi.fn(),
   createCase: vi.fn(),
   createCaseDocument: vi.fn(),
+  createOutboundEmail: caseState.createOutboundEmail,
   getCaseByReference: vi.fn(async () => caseState.currentCase),
   getNotificationsForUser: vi.fn(async () => []),
   getRoleChangeAudits: vi.fn(async () => []),
@@ -37,6 +41,10 @@ vi.mock("./db", () => ({
   recordCaseFollowUp: caseState.recordCaseFollowUp,
   setCaseStatus: caseState.setCaseStatus,
   updateCaseDetails: caseState.updateCaseDetails,
+}));
+
+vi.mock("./automation", () => ({
+  deliverQueuedCommunication: vi.fn(async () => ({ state: "deferred", communicationId: 7, reason: "Maileroo is not configured in this environment." })),
 }));
 
 import { appRouter } from "./routers";
@@ -147,6 +155,28 @@ describe("cases.update", () => {
     const authority = appRouter.createCaller(createContext("authority", 7));
     await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "ESCALATED" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "OPEN" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("queues an authority email only for an authorized case participant", async () => {
+    const owner = appRouter.createCaller(createContext("citizen", 4));
+    const nonOwner = appRouter.createCaller(createContext("citizen", 8));
+
+    await expect(owner.communications.sendToAuthority({
+      caseId: "LG-2026-CASE01",
+      subject: "Request for case update",
+      body: "Please provide the current status of this recorded lien matter.",
+    })).resolves.toMatchObject({ communicationId: 7, delivery: { state: "deferred" } });
+    expect(caseState.createOutboundEmail).toHaveBeenCalledWith(expect.objectContaining({
+      caseRecordId: 1,
+      actorUserId: 4,
+      recipientEmail: "authority@example.com",
+      subject: "[LG-2026-CASE01] Request for case update",
+    }));
+    await expect(nonOwner.communications.sendToAuthority({
+      caseId: "LG-2026-CASE01",
+      subject: "Not allowed",
+      body: "This operation must not be permitted for a different case owner.",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("records an owned citizen follow-up but rejects unauthorized callers", async () => {
