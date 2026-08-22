@@ -47,6 +47,11 @@ async function startServer() {
     }
     next();
   });
+  // Simple health check endpoint for monitoring, load balancers, and container orchestration
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
   // Maileroo webhooks register their own 256 KB JSON parser before this broader
   // document-upload parser so inbound mail events cannot consume upload-sized bodies.
   registerMailerooWebhook(app);
@@ -75,15 +80,16 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  const preferredPort = parseInt(process.env.PORT || "3000", 10);
+  const host = "0.0.0.0";
+  const port = process.env.NODE_ENV === "production" ? preferredPort : await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, host, () => {
+    console.log(`Server running on http://${host}:${port}/`);
   });
 }
 

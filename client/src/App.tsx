@@ -15,9 +15,9 @@ const Documents = lazy(() => import("@/pages/Documents"));
 const Escalations = lazy(() => import("@/pages/Escalations"));
 const Home = lazy(() => import("@/pages/Home"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const StaticPreview = lazy(() => import("@/pages/StaticPreview"));
 const Workspace = lazy(() => import("@/pages/Workspace"));
 const RtiAssistant = lazy(() => import("@/pages/RtiAssistant"));
-const StaticPreview = lazy(() => import("@/pages/StaticPreview"));
 const Timeline = lazy(() => import("@/pages/Timeline"));
 
 function PageLoading() {

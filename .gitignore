@@ -5,6 +5,7 @@
 # Redundant staging / local snapshot directories
 app-source/
 app-source-complete/
+Manus_Delivery/
 
 # Dependencies
 node_modules/

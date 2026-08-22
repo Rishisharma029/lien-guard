@@ -414,7 +414,7 @@ GitHub Pages publishes **documentation only**; it does not run the LienGuard Nod
 
 ## 🚀 Hosting Handoff
 
-For the complete frontend and backend deployment package, start with [`HOSTING_HANDOFF.md`](./HOSTING_HANDOFF.md). It describes the included Docker image, required server-side environment variables, MySQL migration sequence, and the difference between a static Vercel preview and a full LienGuard runtime. For a no-secret visual walkthrough before deployment, run [`pnpm demo:local`](./docs/local_demo.md). If an existing Vercel project is serving a server bundle as text, apply the repository’s [`Vercel static-preview correction`](./docs/vercel_static_preview.md).
+For the complete frontend and backend deployment package, start with [`HOSTING_HANDOFF.md`](./HOSTING_HANDOFF.md). It describes the included Docker image, required server-side environment variables, MySQL migration sequence, and the difference between a static Vercel preview and a full LienGuard runtime. For a no-secret visual walkthrough before deployment, run [`pnpm demo:local`](./docs/local_demo.md).
 
 ---
 
