@@ -26,6 +26,8 @@ import { isValidEmailAddress } from "./maileroo";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { ENV } from "./_core/env";
+import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 
@@ -115,6 +117,24 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    demoAvailable: publicProcedure.query(() => ENV.localDemoMode),
+    demoLogin: publicProcedure.mutation(async ({ ctx }) => {
+      if (!ENV.localDemoMode) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Local demonstration access is unavailable." });
+      }
+
+      const token = await sdk.createSessionToken("local-demo-admin", {
+        name: "LienGuard Demo Administrator",
+        // A short-lived local session makes the demonstration convenient without
+        // turning this development-only path into a durable alternate identity provider.
+        expiresInMs: 8 * 60 * 60 * 1000,
+      });
+      ctx.res.cookie(COOKIE_NAME, token, {
+        ...getSessionCookieOptions(ctx.req),
+        maxAge: 8 * 60 * 60 * 1000,
+      });
+      return { success: true } as const;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

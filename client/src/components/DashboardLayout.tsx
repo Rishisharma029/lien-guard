@@ -15,12 +15,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { loading, user, logout } = useAuth();
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const demoAvailability = trpc.auth.demoAvailable.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const demoLogin = trpc.auth.demoLogin.useMutation({
+    onSuccess: () => { window.location.assign("/cases"); },
+  });
+  const localDemoAvailable = demoAvailability.data === true;
+  const beginAccess = () => {
+    if (localDemoAvailable) {
+      demoLogin.mutate();
+      return;
+    }
+    startLogin();
+  };
   const { data: notifications = [] } = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(user) });
   const markRead = trpc.notifications.markRead.useMutation({ onSuccess: () => utils.notifications.list.invalidate() });
   const handleSignOut = async () => { try { await logout(); } finally { navigate("/workspace"); } };
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-[#f4f6f8]"><div className="text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-5 w-5 animate-pulse" /></span><p className="mt-5 text-sm font-semibold text-[#163453]">Preparing your secure workspace</p></div></main>;
-  if (!user) return <main className="grid min-h-screen place-items-center bg-[#f4f6f8] px-5"><section className="w-full max-w-md rounded-2xl border border-[#dce3eb] bg-white p-8 shadow-xl"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-5 w-5" /></span><p className="eyebrow mt-6 text-[#557087]">LienGuard secure workspace</p><h1 className="font-display mt-2 text-4xl text-[#132f4d]">Sign in to see your cases.</h1><p className="mt-4 text-sm leading-6 text-[#65758a]">Use your Manus account to access the protected case workspace assigned to you.</p><Button onClick={() => startLogin()} className="mt-7 h-11 w-full bg-[#0f2b4b] hover:bg-[#183c63]">Continue with Manus <ChevronRight className="ml-1 h-4 w-4" /></Button></section></main>;
+  if (!user) return <main className="grid min-h-screen place-items-center bg-[#f4f6f8] px-5"><section className="w-full max-w-md rounded-2xl border border-[#dce3eb] bg-white p-8 shadow-xl"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-5 w-5" /></span><p className="eyebrow mt-6 text-[#557087]">LienGuard secure workspace</p><h1 className="font-display mt-2 text-4xl text-[#132f4d]">{localDemoAvailable ? "Open the local demo." : "Sign in to see your cases."}</h1><p className="mt-4 text-sm leading-6 text-[#65758a]">{localDemoAvailable ? "This isolated workspace contains seeded demonstration records. It cannot send email or access production data." : "Use your Manus account to access the protected case workspace assigned to you."}</p><Button disabled={demoLogin.isPending} onClick={beginAccess} className="mt-7 h-11 w-full bg-[#0f2b4b] hover:bg-[#183c63]">{demoLogin.isPending ? "Opening workspace…" : localDemoAvailable ? "Open local demo" : "Continue with Manus"} <ChevronRight className="ml-1 h-4 w-4" /></Button></section></main>;
 
   const primary = [{ label: "Dashboard", href: "/workspace", icon: LayoutDashboard }, { label: "My Cases", href: "/cases", icon: FolderKanban }, { label: "Timeline", href: "/timeline", icon: Gavel }, { label: "Communications", href: "/communications", icon: MessageSquareText }, { label: "Documents", href: "/documents", icon: FileText }, { label: "Escalations", href: "/escalations", icon: Gavel }, { label: "RTI Assistant", href: "/rti", icon: WandSparkles }];
   const initials = user.name?.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase() || "LG";

@@ -1,0 +1,29 @@
+Local demo browser verification
+
+URL: https://3000-ix0ghu1lkumbwakksjs24-5a366316.sg1.manus.computer
+
+Verified on the home route:
+- The page displayed the local-demo label, "Local records. External delivery disabled."
+- The primary entry control was labelled "Open local demo workspace".
+- The homepage explicitly stated "Seeded records · email delivery disabled".
+
+Verified after using local-demo entry:
+- The browser navigated to /cases with an authenticated session for "LienGuard Demo Administrator" in the Administrator role.
+- The protected navigation appeared, including Dashboard, My Cases, Timeline, Communications, Documents, Escalations, RTI Assistant, and User access.
+- The case register displayed three seeded records:
+  1. LG-DEMO-ESC-001 — Escalated / High.
+  2. LG-DEMO-REV-002 — Under Review / Normal.
+  3. LG-DEMO-AWAIT-003 — Awaiting Response / Urgent.
+
+No Maileroo delivery, real email, external inbox, production database, or real OAuth session was used in this test.
+
+Case-detail verification
+
+Verified the protected seeded case route:
+- Opened `/cases/LG-DEMO-ESC-001` successfully as the local demo administrator.
+- The visible case header showed an escalation-required posture, Demo Bank, amount, deadline, controlled demo authority, and invalid-domain local authority address.
+- The workflow panel showed the case stages through escalation and RTI assistance.
+- The immutable case timeline rendered case creation, routing, awaiting response, local-only queued-email simulation, deadline follow-up simulation, local-only inbound-reply simulation, and escalation.
+- Every simulated correspondence explicitly stated that it was local only and that external delivery was disabled or that no external mailbox/Maileroo webhook was used.
+- The case-detail screen exposed the protected authority routing, manual follow-up, lifecycle, and review-only RTI controls.
+- The RTI section explicitly stated that nothing is filed or sent automatically.

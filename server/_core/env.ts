@@ -46,6 +46,9 @@ export const ENV = {
   oAuthServerUrl: optional("OAUTH_SERVER_URL"),
   ownerOpenId: optional("OWNER_OPEN_ID"),
   isProduction: process.env.NODE_ENV === "production",
+  // This flag exists only for the isolated local demonstration runtime. It is
+  // deliberately unavailable in production so it can never replace OAuth.
+  localDemoMode: process.env.NODE_ENV !== "production" && optional("LOCAL_DEMO_MODE").toLowerCase() === "true",
   forgeApiUrl: optional("BUILT_IN_FORGE_API_URL"),
   forgeApiKey: optional("BUILT_IN_FORGE_API_KEY"),
   mailerooSmtpHost: optional("MAILEROO_SMTP_HOST") || "smtp.maileroo.com",
