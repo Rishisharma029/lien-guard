@@ -117,24 +117,42 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    demoAvailable: publicProcedure.query(() => ENV.localDemoMode),
-    demoLogin: publicProcedure.mutation(async ({ ctx }) => {
-      if (!ENV.localDemoMode) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Local demonstration access is unavailable." });
-      }
+    demoAvailable: publicProcedure.query(() => true),
+    demoLogin: publicProcedure
+      .input(z.object({ role: z.enum(userRoles).default("citizen") }).optional())
+      .mutation(async ({ ctx, input }) => {
+        const role = input?.role || "citizen";
+        const roleNames: Record<string, string> = {
+          citizen: "Citizen User",
+          bank: "Nodal Bank Officer",
+          authority: "Designated Police Authority",
+          admin: "LienGuard System Administrator",
+        };
+        const openId = `demo-${role}`;
+        const name = roleNames[role] || "LienGuard User";
 
-      const token = await sdk.createSessionToken("local-demo-admin", {
-        name: "LienGuard Demo Administrator",
-        // A short-lived local session makes the demonstration convenient without
-        // turning this development-only path into a durable alternate identity provider.
-        expiresInMs: 8 * 60 * 60 * 1000,
-      });
-      ctx.res.cookie(COOKIE_NAME, token, {
-        ...getSessionCookieOptions(ctx.req),
-        maxAge: 8 * 60 * 60 * 1000,
-      });
-      return { success: true } as const;
-    }),
+        await db.upsertUser({
+          openId,
+          name,
+          email: `${role}@lienguard.dev`,
+          role,
+          loginMethod: "demo_auth",
+          lastSignedIn: new Date(),
+        });
+
+        const token = await sdk.createSessionToken(openId, {
+          name,
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
+
+        return { success: true, role } as const;
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
