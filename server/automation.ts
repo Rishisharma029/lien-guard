@@ -1,5 +1,5 @@
 import type { Case, CaseCommunication } from "../drizzle/schema";
-import { ENV, isMailerooConfigured } from "./_core/env";
+import { ENV, getEmailDeliveryBlockReason, isEmailRecipientAllowedForDelivery, isMailerooConfigured } from "./_core/env";
 import {
   createDeadlineFollowUpIfAbsent,
   escalateCaseForDeadline,
@@ -47,6 +47,9 @@ export async function deliverQueuedCommunication(communication: CaseCommunicatio
   }
   if (!isMailerooConfigured()) {
     return { state: "deferred", communicationId: communication.id, reason: "Maileroo is not configured in this environment." };
+  }
+  if (!isEmailRecipientAllowedForDelivery(communication.recipientEmail)) {
+    return { state: "deferred", communicationId: communication.id, reason: getEmailDeliveryBlockReason(communication.recipientEmail) };
   }
 
   try {

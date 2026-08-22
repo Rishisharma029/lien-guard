@@ -27,10 +27,14 @@ Store the following values in the deployment platform’s encrypted server-side 
 | `MAILEROO_INBOUND_DOMAIN` | Inbound replies | The domain configured in Maileroo Inbound Routing, without `@`. |
 | `AUTOMATION_SECRET` | Scheduled processing | A newly generated random value of at least 32 characters. |
 | `DEADLINE_ESCALATION_GRACE_HOURS` | Deadline policy | Defaults to `48`; set a documented operating policy. |
+| `EMAIL_DELIVERY_MODE` | External-delivery safety | Defaults to `disabled`. Use `demo` for a controlled test recipient; use `live` only after explicit production approval. |
+| `DEMO_EMAIL_RECIPIENTS` | Demo safety | Comma-separated controlled recipient allowlist. Required for any `demo` delivery. |
 
 > **Credential hygiene:** because an SMTP password was supplied in chat during implementation, rotate it in Maileroo before go-live and store the replacement only in the deployment secret manager.
 
 Maileroo documents `smtp.maileroo.com` and supports authenticated SMTP over port 587 or 2525 with STARTTLS, and port 465 with SSL/TLS. The application uses port 587, requires TLS, validates certificates, imposes connection timeouts, and rejects header-injection characters. [1] [2]
+
+For the hackathon demo, keep `EMAIL_DELIVERY_MODE=demo` and set `DEMO_EMAIL_RECIPIENTS` to one controlled mailbox. This is now enforced server-side: all external email delivery is disabled by default, and demo mode defers any recipient not on that explicit allowlist.
 
 ## 3. Configure Maileroo inbound routing
 
