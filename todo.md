@@ -40,5 +40,5 @@
 - [x] Verify the authenticated Case Management error card and retry action in a live browser session.
 - [x] Capture inspectable authenticated Case Management preview evidence after final validation.
 - [x] Copy the completed LienGuard project source to the connected local LienGuard folder.
-- [ ] Create a new private GitHub repository for the completed LienGuard source.
-- [ ] Push the latest project source to the new private GitHub repository and verify the result.
+- [x] Create a new private GitHub repository for the completed LienGuard source.
+- [x] Push the latest project source to the new private GitHub repository and verify the result.
