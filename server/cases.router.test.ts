@@ -16,17 +16,22 @@ const caseState = vi.hoisted(() => ({
   updateCaseDetails: vi.fn(),
   setCaseStatus: vi.fn(),
   listCaseCommunications: vi.fn(async () => []),
+  listCaseEvents: vi.fn(async () => []),
+  listCaseDocuments: vi.fn(async () => []),
   recordCaseFollowUp: vi.fn(async () => ({ id: 1, caseId: 1, direction: "outbound", subject: "Follow-up request recorded", counterparty: "Authority", body: "Follow-up", state: "recorded", createdAt: new Date() })),
 }));
 
 vi.mock("./db", () => ({
   changeUserRoleWithAudit: vi.fn(),
   createCase: vi.fn(),
+  createCaseDocument: vi.fn(),
   getCaseByReference: vi.fn(async () => caseState.currentCase),
   getNotificationsForUser: vi.fn(async () => []),
   getRoleChangeAudits: vi.fn(async () => []),
   listCasesForUser: vi.fn(async () => []),
   listCaseCommunications: caseState.listCaseCommunications,
+  listCaseDocuments: caseState.listCaseDocuments,
+  listCaseEvents: caseState.listCaseEvents,
   listUsersForAdmin: vi.fn(async () => []),
   markNotificationRead: vi.fn(async () => true),
   recordCaseFollowUp: caseState.recordCaseFollowUp,
@@ -76,6 +81,7 @@ describe("cases.update", () => {
 
     expect(caseState.updateCaseDetails).toHaveBeenCalledWith({
       caseId: "LG-2026-CASE01",
+      actorUserId: 4,
       title: "Updated title",
       description: "Updated case description with enough detail.",
       caseType: "Priority review",
@@ -84,10 +90,10 @@ describe("cases.update", () => {
     expect(result).toMatchObject({ title: "Updated title", priority: "HIGH" });
   });
 
-  it("rejects a non-owner citizen and a bank user before updating the case", async () => {
+  it("rejects non-owner citizen and bank callers before updating the case", async () => {
     caseState.updateCaseDetails.mockReset();
     const citizenCaller = appRouter.createCaller(createContext("citizen", 9));
-    const bankCaller = appRouter.createCaller(createContext("bank", 4));
+    const bankCaller = appRouter.createCaller(createContext("bank", 9));
 
     await expect(citizenCaller.cases.update({ caseId: "LG-2026-CASE01", title: "Not allowed" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(bankCaller.cases.update({ caseId: "LG-2026-CASE01", title: "Not allowed" })).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -124,12 +130,23 @@ describe("cases.update", () => {
     const citizen = appRouter.createCaller(createContext("citizen", 4));
 
     await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "ESCALATED" })).resolves.toMatchObject({ status: "ESCALATED" });
-    expect(caseState.setCaseStatus).toHaveBeenCalledWith("LG-2026-CASE01", "ESCALATED");
+    expect(caseState.setCaseStatus).toHaveBeenCalledWith({
+      caseId: "LG-2026-CASE01",
+      previousStatus: "UNDER_REVIEW",
+      nextStatus: "ESCALATED",
+      actorUserId: 7,
+    });
     await expect(citizen.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "RESOLVED" })).rejects.toMatchObject({ code: "FORBIDDEN" });
 
     caseState.currentCase.status = "RESOLVED";
     await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "UNDER_REVIEW" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     caseState.currentCase.status = "OPEN";
+  });
+
+  it("rejects lifecycle skips and no-op status changes", async () => {
+    const authority = appRouter.createCaller(createContext("authority", 7));
+    await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "ESCALATED" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "OPEN" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("records an owned citizen follow-up but rejects unauthorized callers", async () => {

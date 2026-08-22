@@ -19,6 +19,7 @@ jobs:
       DATABASE_URL: mysql://mock-user:mock-pass@localhost:3306/mock_lienguard
       JWT_SECRET: test-jwt-secret-at-least-32-characters-long
       VITE_APP_ID: lien-guard-test
+      OAUTH_SERVER_URL: https://oauth.test.invalid
 
     steps:
       - name: Checkout Code

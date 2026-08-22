@@ -22,27 +22,48 @@ const formatDate = (date: Date | string | null) => date ? new Date(date).toLocal
 const cleanOptional = (value: string) => value.trim() || undefined;
 const cleanAmount = (value: string) => value.replace(/[₹,\s]/g, "").trim() || undefined;
 
+const initialCaseForm = { title: "", description: "", caseType: "Bank lien / Cybercrime", bankName: "", lienAmount: "", lienDate: "", lienReference: "", transactionReference: "", authorityName: "", responseDeadline: "" };
+type CaseForm = typeof initialCaseForm;
+type FieldErrors = Partial<Record<keyof CaseForm, string>>;
+
+function FieldError({ children }: { children?: string }) {
+  return children ? <p role="alert" className="text-xs font-medium text-[#ad4f43]">{children}</p> : null;
+}
+
 function CreateCase() {
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState("");
-  const [form, setForm] = useState({ title: "", description: "", caseType: "Bank lien / Cybercrime", bankName: "", lienAmount: "", lienDate: "", lienReference: "", transactionReference: "", authorityName: "", responseDeadline: "" });
-  const reset = () => { setForm({ title: "", description: "", caseType: "Bank lien / Cybercrime", bankName: "", lienAmount: "", lienDate: "", lienReference: "", transactionReference: "", authorityName: "", responseDeadline: "" }); setFormError(""); };
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [form, setForm] = useState<CaseForm>(initialCaseForm);
+  const reset = () => { setForm(initialCaseForm); setFormError(""); setFieldErrors({}); };
   const create = trpc.cases.create.useMutation({
     onSuccess: result => { utils.cases.list.invalidate(); setOpen(false); reset(); toast.success(`${result.caseId} was created and added to your case register.`); },
     onError: error => {
-      const fieldErrors = (error.data as { zodError?: { fieldErrors?: Record<string, string[] | undefined> } } | undefined)?.zodError?.fieldErrors;
-      const firstFieldError = fieldErrors ? Object.values(fieldErrors).flat().find(Boolean) : undefined;
-      const message = firstFieldError || "We could not create this case. Check the required details and try again.";
-      setFormError(message);
-      toast.error("Case was not created. Please review the highlighted details.");
+      setFormError(error.message || "We could not create this case. Review the details and try again.");
+      toast.error("Case was not created. Please review the details and try again.");
     },
   });
-  const set = (key: keyof typeof form, value: string) => { setForm(prev => ({ ...prev, [key]: value })); setFormError(""); };
+  const set = (key: keyof CaseForm, value: string) => {
+    setForm(previous => ({ ...previous, [key]: value }));
+    setFieldErrors(previous => ({ ...previous, [key]: undefined }));
+    setFormError("");
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const errors: FieldErrors = {};
     const amount = cleanAmount(form.lienAmount);
-    if (amount && !/^\d+(?:\.\d{1,2})?$/.test(amount)) { setFormError("Lien amount must be a number with up to two decimal places."); return; }
+    if (form.title.trim().length < 4) errors.title = "Enter a clear case title of at least four characters.";
+    if (form.description.trim().length < 10) errors.description = "Describe the matter in at least ten characters.";
+    if (form.caseType.trim().length < 2) errors.caseType = "Choose a case type.";
+    if (amount && !/^\d+(?:\.\d{1,2})?$/.test(amount)) errors.lienAmount = "Use a number with up to two decimal places.";
+    if (form.lienDate && Number.isNaN(new Date(`${form.lienDate}T12:00:00.000Z`).getTime())) errors.lienDate = "Enter a valid lien date.";
+    if (form.responseDeadline && Number.isNaN(new Date(`${form.responseDeadline}T12:00:00.000Z`).getTime())) errors.responseDeadline = "Enter a valid response deadline.";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setFormError("Correct the highlighted fields before creating the case.");
+      return;
+    }
     create.mutate({
       title: form.title.trim(),
       description: form.description.trim(),
@@ -54,10 +75,10 @@ function CreateCase() {
       ...(cleanOptional(form.lienReference) ? { lienReference: cleanOptional(form.lienReference) } : {}),
       ...(cleanOptional(form.transactionReference) ? { transactionReference: cleanOptional(form.transactionReference) } : {}),
       ...(cleanOptional(form.authorityName) ? { authorityName: cleanOptional(form.authorityName) } : {}),
-      ...(form.responseDeadline ? { responseDeadline: new Date(form.responseDeadline) } : {}),
+      ...(form.responseDeadline ? { responseDeadline: new Date(`${form.responseDeadline}T12:00:00.000Z`) } : {}),
     });
   };
-  return <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) setFormError(""); }}><DialogTrigger asChild><Button className="h-10 rounded-lg bg-[#0f2b4b] hover:bg-[#183c63]"><Plus className="mr-2 h-4 w-4" />Create new case</Button></DialogTrigger><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-2xl"><form onSubmit={submit} noValidate><DialogHeader><p className="eyebrow text-[#617f99]">Create new case</p><DialogTitle className="mt-1 text-2xl font-extrabold text-[#132f4d]">Start with the essentials.</DialogTitle></DialogHeader>{formError && <div role="alert" className="mt-5 rounded-xl border border-[#f1d3cb] bg-[#fff8f5] px-4 py-3 text-sm text-[#8c493e]">{formError}</div>}<div className="mt-6 grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Case type</Label><Select value={form.caseType} onValueChange={value => set("caseType", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Bank lien / Cybercrime">Bank lien / Cybercrime</SelectItem><SelectItem value="Lien review">Lien review</SelectItem><SelectItem value="Registration question">Registration question</SelectItem><SelectItem value="Document request">Document request</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Bank <span className="text-[#8895a4]">optional</span></Label><Input value={form.bankName} onChange={event => set("bankName", event.target.value)} placeholder="Bank name" /></div><div className="space-y-2"><Label>Lien amount <span className="text-[#8895a4]">optional</span></Label><Input inputMode="decimal" value={form.lienAmount} onChange={event => set("lienAmount", event.target.value)} placeholder="e.g. 15000 or ₹15,000" /></div><div className="space-y-2"><Label>Lien date <span className="text-[#8895a4]">optional</span></Label><Input type="date" value={form.lienDate} onChange={event => set("lienDate", event.target.value)} /></div><div className="space-y-2"><Label>Reference number <span className="text-[#8895a4]">optional</span></Label><Input value={form.lienReference} onChange={event => set("lienReference", event.target.value)} placeholder="Lien or complaint reference" /></div><div className="space-y-2"><Label>Authority <span className="text-[#8895a4]">optional</span></Label><Input value={form.authorityName} onChange={event => set("authorityName", event.target.value)} placeholder="Authority or department" /></div><div className="space-y-2 sm:col-span-2"><Label>Transaction reference <span className="text-[#8895a4]">optional</span></Label><Input value={form.transactionReference} onChange={event => set("transactionReference", event.target.value)} placeholder="Transaction or bank reference" /></div><div className="space-y-2 sm:col-span-2"><Label>Case title <span className="text-[#b25143]">required</span></Label><Input value={form.title} onChange={event => set("title", event.target.value)} placeholder="A clear summary of the matter" /></div><div className="space-y-2 sm:col-span-2"><Label>What do you need reviewed? <span className="text-[#b25143]">required</span></Label><Textarea value={form.description} onChange={event => set("description", event.target.value)} className="min-h-28" placeholder="Describe the problem and the outcome you need." /></div></div><DialogFooter className="mt-6"><Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending} className="bg-[#0f2b4b] hover:bg-[#183c63]">{create.isPending ? "Creating…" : "Create case"}</Button></DialogFooter></form></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) reset(); }}><DialogTrigger asChild><Button className="h-10 rounded-lg bg-[#0f2b4b] hover:bg-[#183c63]"><Plus className="mr-2 h-4 w-4" />Create new case</Button></DialogTrigger><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-2xl"><form onSubmit={submit} noValidate><DialogHeader><p className="eyebrow text-[#617f99]">Create new case</p><DialogTitle className="mt-1 text-2xl font-extrabold text-[#132f4d]">Start with the essentials.</DialogTitle></DialogHeader>{formError && <div role="alert" className="mt-5 rounded-xl border border-[#f1d3cb] bg-[#fff8f5] px-4 py-3 text-sm text-[#8c493e]">{formError}</div>}<div className="mt-6 grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Case type <span className="text-[#b25143]">required</span></Label><Select value={form.caseType} onValueChange={value => set("caseType", value)}><SelectTrigger aria-invalid={Boolean(fieldErrors.caseType)}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Bank lien / Cybercrime">Bank lien / Cybercrime</SelectItem><SelectItem value="Lien review">Lien review</SelectItem><SelectItem value="Registration question">Registration question</SelectItem><SelectItem value="Document request">Document request</SelectItem></SelectContent></Select><FieldError>{fieldErrors.caseType}</FieldError></div><div className="space-y-2"><Label>Bank <span className="text-[#8895a4]">optional</span></Label><Input value={form.bankName} onChange={event => set("bankName", event.target.value)} placeholder="Bank name" /></div><div className="space-y-2"><Label>Lien amount <span className="text-[#8895a4]">optional</span></Label><Input inputMode="decimal" aria-invalid={Boolean(fieldErrors.lienAmount)} value={form.lienAmount} onChange={event => set("lienAmount", event.target.value)} placeholder="e.g. 15000 or ₹15,000" /><FieldError>{fieldErrors.lienAmount}</FieldError></div><div className="space-y-2"><Label>Lien date <span className="text-[#8895a4]">optional</span></Label><Input type="date" aria-invalid={Boolean(fieldErrors.lienDate)} value={form.lienDate} onChange={event => set("lienDate", event.target.value)} /><FieldError>{fieldErrors.lienDate}</FieldError></div><div className="space-y-2"><Label>Response deadline <span className="text-[#8895a4]">optional</span></Label><Input type="date" aria-invalid={Boolean(fieldErrors.responseDeadline)} value={form.responseDeadline} onChange={event => set("responseDeadline", event.target.value)} /><FieldError>{fieldErrors.responseDeadline}</FieldError></div><div className="space-y-2"><Label>Reference number <span className="text-[#8895a4]">optional</span></Label><Input value={form.lienReference} onChange={event => set("lienReference", event.target.value)} placeholder="Lien or complaint reference" /></div><div className="space-y-2"><Label>Authority <span className="text-[#8895a4]">optional</span></Label><Input value={form.authorityName} onChange={event => set("authorityName", event.target.value)} placeholder="Authority or department" /></div><div className="space-y-2 sm:col-span-2"><Label>Transaction reference <span className="text-[#8895a4]">optional</span></Label><Input value={form.transactionReference} onChange={event => set("transactionReference", event.target.value)} placeholder="Transaction or bank reference" /></div><div className="space-y-2 sm:col-span-2"><Label>Case title <span className="text-[#b25143]">required</span></Label><Input aria-invalid={Boolean(fieldErrors.title)} value={form.title} onChange={event => set("title", event.target.value)} placeholder="A clear summary of the matter" /><FieldError>{fieldErrors.title}</FieldError></div><div className="space-y-2 sm:col-span-2"><Label>What do you need reviewed? <span className="text-[#b25143]">required</span></Label><Textarea aria-invalid={Boolean(fieldErrors.description)} value={form.description} onChange={event => set("description", event.target.value)} className="min-h-28" placeholder="Describe the problem and the outcome you need." /><FieldError>{fieldErrors.description}</FieldError></div></div><DialogFooter className="mt-6"><Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={create.isPending}>Cancel</Button><Button type="submit" disabled={create.isPending} className="bg-[#0f2b4b] hover:bg-[#183c63]">{create.isPending ? "Creating…" : "Create case"}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 export default function Cases() {

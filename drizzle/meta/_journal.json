@@ -36,6 +36,13 @@
       "when": 1787415507991,
       "tag": "0004_curly_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787420669031,
+      "tag": "0005_secure_case_audit_and_documents",
+      "breakpoints": true
     }
   ]
 }

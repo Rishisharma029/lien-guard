@@ -4,8 +4,12 @@ export const userRoles = ["citizen", "bank", "authority", "admin"] as const;
 export type LienGuardRole = (typeof userRoles)[number];
 export const caseStatuses = ["OPEN", "UNDER_REVIEW", "AWAITING_RESPONSE", "ESCALATED", "RESOLVED", "CLOSED"] as const;
 export const casePriorities = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
+export const caseEventTypes = ["CASE_CREATED", "DETAILS_UPDATED", "STATUS_CHANGED", "COMMUNICATION_RECORDED", "DOCUMENT_UPLOADED", "RTI_DRAFT_CREATED"] as const;
+export const caseDocumentKinds = ["EVIDENCE", "CORRESPONDENCE", "RTI_DRAFT", "OTHER"] as const;
 export type CaseStatus = (typeof caseStatuses)[number];
 export type CasePriority = (typeof casePriorities)[number];
+export type CaseEventType = (typeof caseEventTypes)[number];
+export type CaseDocumentKind = (typeof caseDocumentKinds)[number];
 
 /** Core user record created and refreshed by the Manus OAuth flow. */
 export const users = mysqlTable("users", {
@@ -76,6 +80,39 @@ export const caseCommunications = mysqlTable(
   table => [index("case_communications_case_created_idx").on(table.caseId, table.createdAt)],
 );
 
+/** Immutable activity stream used to explain the actual case journey. */
+export const caseEvents = mysqlTable(
+  "case_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caseId: int("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+    actorUserId: int("actor_user_id").notNull().references(() => users.id),
+    type: mysqlEnum("type", caseEventTypes).notNull(),
+    message: varchar("message", { length: 500 }).notNull(),
+    previousStatus: mysqlEnum("previous_status", caseStatuses),
+    nextStatus: mysqlEnum("next_status", caseStatuses),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  table => [index("case_events_case_created_idx").on(table.caseId, table.createdAt)],
+);
+
+/** File metadata is persisted here; file bytes always remain in protected object storage. */
+export const caseDocuments = mysqlTable(
+  "case_documents",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caseId: int("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+    uploadedByUserId: int("uploaded_by_user_id").notNull().references(() => users.id),
+    kind: mysqlEnum("kind", caseDocumentKinds).default("EVIDENCE").notNull(),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    storageKey: varchar("storage_key", { length: 512 }).notNull().unique(),
+    contentType: varchar("content_type", { length: 127 }).notNull(),
+    sizeBytes: int("size_bytes").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  table => [index("case_documents_case_created_idx").on(table.caseId, table.createdAt)],
+);
+
 export const roleChangeAudits = mysqlTable(
   "role_change_audits",
   {
@@ -98,3 +135,5 @@ export type UserNotification = typeof userNotifications.$inferSelect;
 export type RoleChangeAudit = typeof roleChangeAudits.$inferSelect;
 export type Case = typeof cases.$inferSelect;
 export type CaseCommunication = typeof caseCommunications.$inferSelect;
+export type CaseEvent = typeof caseEvents.$inferSelect;
+export type CaseDocument = typeof caseDocuments.$inferSelect;

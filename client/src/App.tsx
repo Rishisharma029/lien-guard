@@ -1,22 +1,27 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import AdminUsers from "@/pages/AdminUsers";
-import CaseDetail from "@/pages/CaseDetail";
-import CaseWorklist from "@/pages/CaseWorklist";
-import Cases from "@/pages/Cases";
-import Communications from "@/pages/Communications";
-import Documents from "@/pages/Documents";
-import Escalations from "@/pages/Escalations";
-import Home from "@/pages/Home";
-import NotFound from "@/pages/NotFound";
-import Workspace from "@/pages/Workspace";
-import RtiAssistant from "@/pages/RtiAssistant";
-import Timeline from "@/pages/Timeline";
 import { Route, Switch } from "wouter";
+import { lazy, Suspense } from "react";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ThemeToggle from "./components/ThemeToggle";
 import { ThemeProvider } from "./contexts/ThemeContext";
+
+const AdminUsers = lazy(() => import("@/pages/AdminUsers"));
+const CaseDetail = lazy(() => import("@/pages/CaseDetail"));
+const Cases = lazy(() => import("@/pages/Cases"));
+const Communications = lazy(() => import("@/pages/Communications"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const Escalations = lazy(() => import("@/pages/Escalations"));
+const Home = lazy(() => import("@/pages/Home"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Workspace = lazy(() => import("@/pages/Workspace"));
+const RtiAssistant = lazy(() => import("@/pages/RtiAssistant"));
+const Timeline = lazy(() => import("@/pages/Timeline"));
+
+function PageLoading() {
+  return <main className="grid min-h-screen place-items-center bg-background text-sm font-medium text-muted-foreground">Loading secure workspace…</main>;
+}
 
 function WorkspaceRoute() {
   return <DashboardLayout><Workspace /></DashboardLayout>;
@@ -44,20 +49,22 @@ function RtiRoute() { return <DashboardLayout><RtiAssistant /></DashboardLayout>
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/workspace" component={WorkspaceRoute} />
-      <Route path="/cases" component={CasesRoute} />
-      <Route path="/cases/:caseId" component={CaseDetailRoute} />
-      <Route path="/timeline" component={TimelineRoute} />
-      <Route path="/communications" component={CommunicationsRoute} />
-      <Route path="/documents" component={DocumentsRoute} />
-      <Route path="/escalations" component={EscalationsRoute} />
-      <Route path="/rti" component={RtiRoute} />
-      <Route path="/admin/users" component={UserManagementRoute} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoading />}>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/workspace" component={WorkspaceRoute} />
+        <Route path="/cases" component={CasesRoute} />
+        <Route path="/cases/:caseId" component={CaseDetailRoute} />
+        <Route path="/timeline" component={TimelineRoute} />
+        <Route path="/communications" component={CommunicationsRoute} />
+        <Route path="/documents" component={DocumentsRoute} />
+        <Route path="/escalations" component={EscalationsRoute} />
+        <Route path="/rti" component={RtiRoute} />
+        <Route path="/admin/users" component={UserManagementRoute} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
