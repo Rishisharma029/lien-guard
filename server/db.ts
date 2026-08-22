@@ -2,11 +2,13 @@ import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   Case,
+  CaseCommunication,
   CasePriority,
   CaseStatus,
   InsertUser,
   LienGuardRole,
   cases,
+  caseCommunications,
   roleChangeAudits,
   userNotifications,
   users,
@@ -219,6 +221,13 @@ export async function createCase(input: {
   description: string;
   caseType: string;
   priority: CasePriority;
+  bankName?: string;
+  lienAmount?: string;
+  lienDate?: Date;
+  lienReference?: string;
+  transactionReference?: string;
+  authorityName?: string;
+  responseDeadline?: Date;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
@@ -242,6 +251,13 @@ export async function updateCaseDetails(input: {
   description?: string;
   caseType?: string;
   priority?: CasePriority;
+  bankName?: string;
+  lienAmount?: string;
+  lienDate?: Date;
+  lienReference?: string;
+  transactionReference?: string;
+  authorityName?: string;
+  responseDeadline?: Date;
 }): Promise<Case | undefined> {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
@@ -249,4 +265,29 @@ export async function updateCaseDetails(input: {
   const { caseId, ...values } = input;
   await db.update(cases).set(values).where(eq(cases.caseId, caseId));
   return getCaseByReference(caseId);
+}
+
+export async function listCaseCommunications(caseRecordId: number): Promise<CaseCommunication[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(caseCommunications).where(eq(caseCommunications.caseId, caseRecordId)).orderBy(desc(caseCommunications.createdAt));
+}
+
+export async function recordCaseFollowUp(input: {
+  caseRecordId: number;
+  authorityName?: string | null;
+  note?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db.insert(caseCommunications).values({
+    caseId: input.caseRecordId,
+    direction: "outbound",
+    subject: "Follow-up request recorded",
+    counterparty: input.authorityName || null,
+    body: input.note || "A follow-up request was recorded in LienGuard. External delivery must be completed through the appropriate authority channel.",
+    state: "recorded",
+  });
+  const entries = await listCaseCommunications(input.caseRecordId);
+  return entries[0];
 }

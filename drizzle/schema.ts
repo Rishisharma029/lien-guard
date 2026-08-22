@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const userRoles = ["citizen", "bank", "authority", "admin"] as const;
 export type LienGuardRole = (typeof userRoles)[number];
@@ -43,6 +43,13 @@ export const cases = mysqlTable(
     title: varchar("title", { length: 180 }).notNull(),
     description: text("description").notNull(),
     caseType: varchar("case_type", { length: 80 }).notNull(),
+    bankName: varchar("bank_name", { length: 160 }),
+    lienAmount: decimal("lien_amount", { precision: 14, scale: 2 }),
+    lienDate: timestamp("lien_date"),
+    lienReference: varchar("lien_reference", { length: 96 }),
+    transactionReference: varchar("transaction_reference", { length: 96 }),
+    authorityName: varchar("authority_name", { length: 160 }),
+    responseDeadline: timestamp("response_deadline"),
     status: mysqlEnum("status", caseStatuses).default("OPEN").notNull(),
     priority: mysqlEnum("priority", casePriorities).default("NORMAL").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -52,6 +59,21 @@ export const cases = mysqlTable(
     index("cases_user_updated_idx").on(table.userId, table.updatedAt),
     index("cases_status_updated_idx").on(table.status, table.updatedAt),
   ],
+);
+
+export const caseCommunications = mysqlTable(
+  "case_communications",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caseId: int("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+    direction: mysqlEnum("direction", ["outbound", "inbound"]).notNull(),
+    subject: varchar("subject", { length: 180 }).notNull(),
+    counterparty: varchar("counterparty", { length: 160 }),
+    body: text("body").notNull(),
+    state: mysqlEnum("state", ["recorded", "received"]).default("recorded").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  table => [index("case_communications_case_created_idx").on(table.caseId, table.createdAt)],
 );
 
 export const roleChangeAudits = mysqlTable(
@@ -75,3 +97,4 @@ export type InsertUser = typeof users.$inferInsert;
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type RoleChangeAudit = typeof roleChangeAudits.$inferSelect;
 export type Case = typeof cases.$inferSelect;
+export type CaseCommunication = typeof caseCommunications.$inferSelect;

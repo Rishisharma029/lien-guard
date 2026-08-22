@@ -1,16 +1,18 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { casePriorities, caseStatuses, userRoles } from "../drizzle/schema";
-import { canAccessCase, canUpdateCaseDetails, canUpdateCaseStatus, isCaseStatusTransitionAllowed } from "./cases";
+import { canAccessCase, canUpdateCaseDetails, canUpdateCaseStatus, createCaseTimeline, getCaseHealth, isCaseStatusTransitionAllowed } from "./cases";
 import {
   changeUserRoleWithAudit,
   createCase,
   getCaseByReference,
   getNotificationsForUser,
   getRoleChangeAudits,
+  listCaseCommunications,
   listCasesForUser,
   listUsersForAdmin,
   markNotificationRead,
+  recordCaseFollowUp,
   setCaseStatus,
   updateCaseDetails,
 } from "./db";
@@ -87,12 +89,33 @@ export const appRouter = router({
         }
         return caseRecord;
       }),
+    detail: protectedProcedure
+      .input(z.object({ caseId: z.string().min(4).max(32) }))
+      .query(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!canAccessCase(ctx.user.role, ctx.user.id, caseRecord.userId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this case." });
+        }
+        return {
+          case: caseRecord,
+          health: getCaseHealth(caseRecord),
+          timeline: createCaseTimeline(caseRecord),
+        };
+      }),
     create: protectedProcedure
       .input(z.object({
         title: z.string().trim().min(4).max(180),
         description: z.string().trim().min(10).max(5000),
         caseType: z.string().trim().min(2).max(80),
         priority: z.enum(casePriorities).default("NORMAL"),
+        bankName: z.string().trim().min(2).max(160).optional(),
+        lienAmount: z.string().trim().regex(/^\d+(?:\.\d{1,2})?$/, "Enter a valid lien amount.").optional(),
+        lienDate: z.coerce.date().optional(),
+        lienReference: z.string().trim().min(2).max(96).optional(),
+        transactionReference: z.string().trim().min(2).max(96).optional(),
+        authorityName: z.string().trim().min(2).max(160).optional(),
+        responseDeadline: z.coerce.date().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const created = await createCase({ userId: ctx.user.id, ...input });
@@ -106,6 +129,13 @@ export const appRouter = router({
         description: z.string().trim().min(10).max(5000).optional(),
         caseType: z.string().trim().min(2).max(80).optional(),
         priority: z.enum(casePriorities).optional(),
+        bankName: z.string().trim().min(2).max(160).optional(),
+        lienAmount: z.string().trim().regex(/^\d+(?:\.\d{1,2})?$/, "Enter a valid lien amount.").optional(),
+        lienDate: z.coerce.date().optional(),
+        lienReference: z.string().trim().min(2).max(96).optional(),
+        transactionReference: z.string().trim().min(2).max(96).optional(),
+        authorityName: z.string().trim().min(2).max(160).optional(),
+        responseDeadline: z.coerce.date().optional(),
       }).refine(input => Object.keys(input).some(key => key !== "caseId"), {
         message: "Provide at least one case field to update.",
       }))
@@ -138,6 +168,30 @@ export const appRouter = router({
         const updated = await setCaseStatus(input.caseId, input.status);
         if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Case status could not be updated." });
         return updated;
+      }),
+  }),
+  communications: router({
+    list: protectedProcedure
+      .input(z.object({ caseId: z.string().min(4).max(32) }))
+      .query(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!canAccessCase(ctx.user.role, ctx.user.id, caseRecord.userId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this case." });
+        }
+        return listCaseCommunications(caseRecord.id);
+      }),
+    recordFollowUp: protectedProcedure
+      .input(z.object({ caseId: z.string().min(4).max(32), note: z.string().trim().max(1200).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!canUpdateCaseDetails({ role: ctx.user.role, currentUserId: ctx.user.id, caseOwnerId: caseRecord.userId, status: caseRecord.status })) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission to record a follow-up for this case." });
+        }
+        const entry = await recordCaseFollowUp({ caseRecordId: caseRecord.id, authorityName: caseRecord.authorityName, note: input.note });
+        if (!entry) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Follow-up could not be recorded." });
+        return entry;
       }),
   }),
   users: router({

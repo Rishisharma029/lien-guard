@@ -15,6 +15,8 @@ const caseState = vi.hoisted(() => ({
   },
   updateCaseDetails: vi.fn(),
   setCaseStatus: vi.fn(),
+  listCaseCommunications: vi.fn(async () => []),
+  recordCaseFollowUp: vi.fn(async () => ({ id: 1, caseId: 1, direction: "outbound", subject: "Follow-up request recorded", counterparty: "Authority", body: "Follow-up", state: "recorded", createdAt: new Date() })),
 }));
 
 vi.mock("./db", () => ({
@@ -24,8 +26,10 @@ vi.mock("./db", () => ({
   getNotificationsForUser: vi.fn(async () => []),
   getRoleChangeAudits: vi.fn(async () => []),
   listCasesForUser: vi.fn(async () => []),
+  listCaseCommunications: caseState.listCaseCommunications,
   listUsersForAdmin: vi.fn(async () => []),
   markNotificationRead: vi.fn(async () => true),
+  recordCaseFollowUp: caseState.recordCaseFollowUp,
   setCaseStatus: caseState.setCaseStatus,
   updateCaseDetails: caseState.updateCaseDetails,
 }));
@@ -103,6 +107,14 @@ describe("cases.update", () => {
     await expect(authority.cases.get({ caseId: "LG-2026-CASE01" })).resolves.toMatchObject({ caseId: "LG-2026-CASE01" });
   });
 
+  it("returns a protected case detail package only to callers with case access", async () => {
+    const owner = appRouter.createCaller(createContext("citizen", 4));
+    const nonOwner = appRouter.createCaller(createContext("citizen", 9));
+
+    await expect(owner.cases.detail({ caseId: "LG-2026-CASE01" })).resolves.toMatchObject({ case: { caseId: "LG-2026-CASE01" }, timeline: expect.any(Array) });
+    await expect(nonOwner.cases.detail({ caseId: "LG-2026-CASE01" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("permits authority lifecycle updates while rejecting citizens and terminal-case reopens", async () => {
     caseState.currentCase.status = "UNDER_REVIEW";
     caseState.setCaseStatus.mockReset();
@@ -118,5 +130,12 @@ describe("cases.update", () => {
     caseState.currentCase.status = "RESOLVED";
     await expect(authority.cases.updateStatus({ caseId: "LG-2026-CASE01", status: "UNDER_REVIEW" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     caseState.currentCase.status = "OPEN";
+  });
+
+  it("records an owned citizen follow-up but rejects unauthorized callers", async () => {
+    const owner = appRouter.createCaller(createContext("citizen", 4));
+    const nonOwner = appRouter.createCaller(createContext("citizen", 8));
+    await expect(owner.communications.recordFollowUp({ caseId: "LG-2026-CASE01", note: "Please provide an update." })).resolves.toMatchObject({ subject: "Follow-up request recorded" });
+    await expect(nonOwner.communications.recordFollowUp({ caseId: "LG-2026-CASE01" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

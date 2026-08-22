@@ -15,5 +15,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    env: {
+      DATABASE_URL: "mysql://mock-user:mock-pass@localhost:3306/mock_lienguard",
+      JWT_SECRET: "test-jwt-secret-at-least-32-characters-long",
+      NODE_ENV: "test",
+    },
   },
 });

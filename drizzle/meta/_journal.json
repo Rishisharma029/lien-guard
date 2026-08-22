@@ -22,6 +22,20 @@
       "when": 1787386306237,
       "tag": "0002_fresh_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787415139546,
+      "tag": "0003_fixed_the_santerians",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1787415507991,
+      "tag": "0004_curly_ikaris",
+      "breakpoints": true
     }
   ]
 }

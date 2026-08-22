@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LienGuard | Enterprise Property Lien & Dispute Governance Platform</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Mermaid.js for Interactive Diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e',
+            },
+            shield: {
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .glass-nav {
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .code-box {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-sky-500 selection:text-white">
+
+  <!-- Top Announcement Banner -->
+  <div class="bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 px-4 py-2 text-center text-xs font-semibold tracking-wide text-white shadow-inner flex items-center justify-center gap-2">
+    <span class="inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider">v1.0.0</span>
+    <span>LienGuard Production Release: Multi-Role Property Lien & Dispute Governance</span>
+    <a href="#quickstart" class="underline underline-offset-2 hover:text-sky-200 transition">Get Started &rarr;</a>
+  </div>
+
+  <!-- Navigation Bar -->
+  <nav class="sticky top-0 z-50 glass-nav bg-slate-950/80 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 ring-1 ring-white/20">
+            <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
+          </div>
+          <div>
+            <span class="text-xl font-bold bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">LienGuard</span>
+            <span class="text-2xs font-medium text-sky-400 block -mt-1 tracking-wider uppercase">Governance Platform</span>
+          </div>
+        </div>
+
+        <!-- Desktop Menu -->
+        <div class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+          <a href="#overview" class="hover:text-sky-400 transition-colors">Overview</a>
+          <a href="#features" class="hover:text-sky-400 transition-colors">Features</a>
+          <a href="#architecture" class="hover:text-sky-400 transition-colors">Architecture</a>
+          <a href="#rbac-simulator" class="hover:text-sky-400 transition-colors">RBAC Matrix</a>
+          <a href="#state-machine" class="hover:text-sky-400 transition-colors">Case Lifecycle</a>
+          <a href="#api" class="hover:text-sky-400 transition-colors">tRPC API</a>
+          <a href="#quickstart" class="hover:text-sky-400 transition-colors">Quickstart</a>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-3">
+          <a href="https://github.com/Rishisharma029/lien-guard" target="_blank" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium border border-slate-700/60 transition shadow-sm">
+            <i data-lucide="github" class="w-4 h-4"></i>
+            <span>GitHub</span>
+          </a>
+          <a href="#quickstart" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-sm font-semibold shadow-lg shadow-sky-500/25 transition">
+            <span>Install</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative overflow-hidden pt-20 pb-28 border-b border-slate-800/80">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-900/20 via-slate-950 to-slate-950 -z-10"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      
+      <!-- Pill Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-semibold mb-8">
+        <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+        <span>Cryptographic Auditability &bull; Multi-Role Governance &bull; Full Case Lifecycle</span>
+      </div>
+
+      <!-- Main Headline -->
+      <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-tight sm:leading-none mb-6">
+        Next-Generation <span class="bg-gradient-to-r from-sky-400 via-indigo-300 to-sky-200 bg-clip-text text-transparent">Property Lien & Claim</span> Governance
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+        An enterprise-grade, multi-stakeholder platform connecting Citizens, Banking Institutions, Legal Authorities, and System Administrators with immutable audit logs and real-time transparency.
+      </p>
+
+      <!-- CTA Buttons -->
+      <div class="flex flex-wrap items-center justify-center gap-4">
+        <a href="#quickstart" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-base shadow-xl shadow-sky-500/20 flex items-center gap-2 transition">
+          <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+          <span>Launch Local Instance</span>
+        </a>
+        <a href="#architecture" class="px-6 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-base border border-slate-700 transition flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4"></i>
+          <span>Explore Architecture</span>
+        </a>
+      </div>
+
+      <!-- Quick Badges -->
+      <div class="mt-14 pt-8 border-t border-slate-800/60 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div class="text-2xl font-bold text-sky-400">4 Roles</div>
+          <div class="text-xs text-slate-400 mt-1">Citizen, Bank, Authority, Admin</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div class="text-2xl font-bold text-emerald-400">100% Audit</div>
+          <div class="text-xs text-slate-400 mt-1">Immutable Logged Events</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div class="text-2xl font-bold text-indigo-400">tRPC v11</div>
+          <div class="text-xs text-slate-400 mt-1">End-to-End Type Safety</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div class="text-2xl font-bold text-purple-400">React 19</div>
+          <div class="text-xs text-slate-400 mt-1">Tailwind v4 & Radix UI</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Key Features Grid -->
+  <section id="features" class="py-20 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">Core Capabilities</h2>
+        <p class="text-3xl font-extrabold text-white">Engineered for Enterprise Compliance & Trust</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        
+        <!-- Feature 1 -->
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-sky-500/40 transition group">
+          <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
+            <i data-lucide="shield-alert" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Role-Aware Workspaces</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            Tailored dashboards for Citizens, Lending Banks, Legal Authorities, and Administrators with isolated permissions and secure views.
+          </p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition group">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
+            <i data-lucide="file-check" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Case Lifecycle Engine</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            Rigid 6-state transition lifecycle preventing illegal status jumps, terminal state re-opening, or unprivileged case manipulations.
+          </p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
+            <i data-lucide="history" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Immutable Audit Logging</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            Every administrative action and role change is committed transactionally with full provenance tracking and target notification dispatch.
+          </p>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/40 transition group">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
+            <i data-lucide="bell-ring" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">In-App Transparency</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            Real-time notification engine informing affected parties instantly upon permission elevations, reviews, or status resolutions.
+          </p>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-purple-500/40 transition group">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
+            <i data-lucide="cpu" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">tRPC & Zod Safety</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            End-to-end full-stack type safety from MySQL Drizzle schema to React components with compile-time verification.
+          </p>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-rose-500/40 transition group">
+          <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
+            <i data-lucide="refresh-cw" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Resilient Failure Recovery</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">
+            Built-in error boundaries, failure probe simulations, and one-click query retry mechanisms for maximum operational uptime.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive RBAC Simulator -->
+  <section id="rbac-simulator" class="py-20 bg-slate-900/40 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-12">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">Interactive RBAC Matrix</h2>
+        <p class="text-3xl font-extrabold text-white">Select a Stakeholder Role to Inspect Capabilities</p>
+      </div>
+
+      <!-- Role Selector Tabs -->
+      <div class="flex flex-wrap items-center justify-center gap-3 mb-10">
+        <button onclick="selectRole('citizen')" id="tab-citizen" class="role-btn px-5 py-2.5 rounded-xl font-semibold text-sm transition bg-sky-600 text-white shadow-lg shadow-sky-600/30">
+          <i data-lucide="user" class="w-4 h-4 inline-block mr-1.5"></i> Citizen
+        </button>
+        <button onclick="selectRole('bank')" id="tab-bank" class="role-btn px-5 py-2.5 rounded-xl font-semibold text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          <i data-lucide="building-2" class="w-4 h-4 inline-block mr-1.5"></i> Lending Bank
+        </button>
+        <button onclick="selectRole('authority')" id="tab-authority" class="role-btn px-5 py-2.5 rounded-xl font-semibold text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          <i data-lucide="badge-check" class="w-4 h-4 inline-block mr-1.5"></i> Legal Authority
+        </button>
+        <button onclick="selectRole('admin')" id="tab-admin" class="role-btn px-5 py-2.5 rounded-xl font-semibold text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+          <i data-lucide="shield-alert" class="w-4 h-4 inline-block mr-1.5"></i> System Admin
+        </button>
+      </div>
+
+      <!-- Interactive Display Card -->
+      <div id="role-display-card" class="max-w-4xl mx-auto p-8 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Case Lifecycle State Machine -->
+  <section id="state-machine" class="py-20 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-12">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">State Transition Model</h2>
+        <p class="text-3xl font-extrabold text-white">Case Lifecycle State Machine</p>
+      </div>
+
+      <!-- Visual State Progress Flow -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
+        <div class="p-4 rounded-xl bg-slate-900 border border-sky-500/40 text-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-sky-400 mb-2"></span>
+          <div class="font-bold text-white text-sm">OPEN</div>
+          <div class="text-2xs text-slate-400 mt-1">Initiated by Owner</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 mb-2"></span>
+          <div class="font-bold text-white text-sm">UNDER_REVIEW</div>
+          <div class="text-2xs text-slate-400 mt-1">Authority Queue</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 mb-2"></span>
+          <div class="font-bold text-white text-sm">AWAITING_RESPONSE</div>
+          <div class="text-2xs text-slate-400 mt-1">Evidence Pending</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-400 mb-2"></span>
+          <div class="font-bold text-white text-sm">ESCALATED</div>
+          <div class="text-2xs text-slate-400 mt-1">Dispute Flagged</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 mb-2"></span>
+          <div class="font-bold text-white text-sm">RESOLVED</div>
+          <div class="text-2xs text-slate-400 mt-1">Lien Cleared</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-slate-400 mb-2"></span>
+          <div class="font-bold text-white text-sm">CLOSED</div>
+          <div class="text-2xs text-slate-400 mt-1">Terminal State</div>
+        </div>
+      </div>
+
+      <!-- Mermaid Diagram Render -->
+      <div class="max-w-4xl mx-auto p-6 rounded-2xl bg-slate-900/90 border border-slate-800 text-center">
+        <pre class="mermaid text-xs">
+stateDiagram-v2
+    [*] --> OPEN: Case Created (Citizen/Bank)
+    OPEN --> UNDER_REVIEW: Authority Claims Queue
+    UNDER_REVIEW --> AWAITING_RESPONSE: Clarification / Evidence Required
+    AWAITING_RESPONSE --> UNDER_REVIEW: Citizen/Bank Updates Case
+    UNDER_REVIEW --> ESCALATED: Legal / Regulatory Dispute Flagged
+    ESCALATED --> UNDER_REVIEW: Resolution Proposed
+    UNDER_REVIEW --> RESOLVED: Claim Verified / Lien Discharged
+    UNDER_REVIEW --> CLOSED: Completed / Dismissed
+    RESOLVED --> [*]
+    CLOSED --> [*]
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Technical Architecture & ER Diagram -->
+  <section id="architecture" class="py-20 bg-slate-900/30 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">System Blueprint</h2>
+        <p class="text-3xl font-extrabold text-white">High-Level Architectural Flow</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Architecture Diagram -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800">
+          <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <i data-lucide="layers" class="w-5 h-5 text-sky-400"></i>
+            <span>System Data Flow</span>
+          </h3>
+          <pre class="mermaid text-xs">
+flowchart TB
+    Client["React 19 Frontend (SPA)"]
+    TRPC["tRPC v11 Router & RBAC Middleware"]
+    DBEngine["Drizzle ORM + MySQL/TiDB"]
+    Audit["Immutable Audit Table"]
+    Notif["User Notification Service"]
+    S3Storage["AWS S3 Document Vault"]
+
+    Client -->|Type-Safe Query / Mutation| TRPC
+    TRPC -->|Validated DB Operations| DBEngine
+    TRPC -->|Admin Role Mutations| Audit
+    TRPC -->|Transparency Dispatches| Notif
+    Client -.->|Document Uploads| S3Storage
+          </pre>
+        </div>
+
+        <!-- ER Diagram -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800">
+          <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <i data-lucide="database" class="w-5 h-5 text-indigo-400"></i>
+            <span>Entity Relationship Model</span>
+          </h3>
+          <pre class="mermaid text-xs">
+erDiagram
+    users ||--o{ cases : "owns"
+    users ||--o{ user_notifications : "receives"
+    users ||--o{ role_change_audits : "audited"
+
+    users {
+        int id PK
+        varchar openId UK
+        enum role "citizen|bank|authority|admin"
+    }
+    cases {
+        int id PK
+        varchar caseId UK
+        enum status "6 lifecycle states"
+        enum priority "4 priority levels"
+    }
+    role_change_audits {
+        int id PK
+        int targetUserId FK
+        int changedByUserId FK
+    }
+          </pre>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- tRPC API Explorer -->
+  <section id="api" class="py-20 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">API Reference</h2>
+        <p class="text-3xl font-extrabold text-white">tRPC v11 Procedure Catalog</p>
+      </div>
+
+      <div class="space-y-4 max-w-4xl mx-auto">
+        
+        <!-- API Endpoint 1 -->
+        <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">QUERY</span>
+              <span class="text-sm font-mono font-semibold text-white">cases.list</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1.5">Returns all cases visible to the authenticated user's role scope.</p>
+          </div>
+          <span class="text-xs font-medium px-2.5 py-1 rounded bg-slate-800 text-slate-300 self-start sm:self-auto">All Roles</span>
+        </div>
+
+        <!-- API Endpoint 2 -->
+        <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">MUTATION</span>
+              <span class="text-sm font-mono font-semibold text-white">cases.create</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1.5">Creates a new property lien dispute case with unique reference ID.</p>
+          </div>
+          <span class="text-xs font-medium px-2.5 py-1 rounded bg-slate-800 text-slate-300 self-start sm:self-auto">Citizen / Bank</span>
+        </div>
+
+        <!-- API Endpoint 3 -->
+        <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">MUTATION</span>
+              <span class="text-sm font-mono font-semibold text-white">cases.updateStatus</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1.5">Advances or updates the lifecycle state of a case according to transition rules.</p>
+          </div>
+          <span class="text-xs font-medium px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 self-start sm:self-auto">Authority / Admin</span>
+        </div>
+
+        <!-- API Endpoint 4 -->
+        <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">ADMIN MUTATION</span>
+              <span class="text-sm font-mono font-semibold text-white">users.changeRole</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1.5">Updates user role with atomic audit record and recipient notification.</p>
+          </div>
+          <span class="text-xs font-medium px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 self-start sm:self-auto">Admin Only</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Quickstart Installation Guide -->
+  <section id="quickstart" class="py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">Get Started</h2>
+        <p class="text-3xl font-extrabold text-white">Running LienGuard in 3 Steps</p>
+      </div>
+
+      <div class="max-w-3xl mx-auto space-y-6">
+        
+        <!-- Step 1 -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center">1</span>
+            <h3 class="text-base font-bold text-white">Clone and Install Dependencies</h3>
+          </div>
+          <div class="code-box bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
+            <code>git clone https://github.com/Rishisharma029/lien-guard.git &amp;&amp; cd lien-guard &amp;&amp; pnpm install</code>
+            <button onclick="copyCode(this, 'git clone https://github.com/Rishisharma029/lien-guard.git && cd lien-guard && pnpm install')" class="text-slate-400 hover:text-white transition">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center">2</span>
+            <h3 class="text-base font-bold text-white">Configure Environment &amp; Migrate Database</h3>
+          </div>
+          <div class="code-box bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
+            <code>cp .env.example .env &amp;&amp; pnpm run db:push</code>
+            <button onclick="copyCode(this, 'cp .env.example .env && pnpm run db:push')" class="text-slate-400 hover:text-white transition">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center">3</span>
+            <h3 class="text-base font-bold text-white">Launch Development Server</h3>
+          </div>
+          <div class="code-box bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
+            <code>pnpm run dev</code>
+            <button onclick="copyCode(this, 'pnpm run dev')" class="text-slate-400 hover:text-white transition">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-12 bg-slate-950 border-t border-slate-800 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+      <div class="flex flex-wrap items-center justify-center gap-6 text-slate-400 font-medium">
+        <a href="https://github.com" target="_blank" class="hover:text-white transition">GitHub</a>
+        <a href="../LICENSE" class="hover:text-white transition">MIT License</a>
+        <a href="../CODE_OF_CONDUCT.md" class="hover:text-white transition">Code of Conduct</a>
+        <a href="../CONTRIBUTING.md" class="hover:text-white transition">Contributing</a>
+        <a href="../SECURITY.md" class="hover:text-white transition">Security Policy</a>
+        <a href="../ARCHITECTURE.md" class="hover:text-white transition">Architecture</a>
+      </div>
+      <p>&copy; 2026 LienGuard Contributors. Released under the MIT License.</p>
+    </div>
+  </footer>
+
+  <!-- Script for Interactive Simulator -->
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    lucide.createIcons();
+
+    const roleData = {
+      citizen: {
+        title: "Citizen Workspace",
+        badge: "Default Role",
+        color: "sky",
+        description: "Focuses on personal property ownership protection, lien discharge verification, and dispute case filing.",
+        capabilities: [
+          "View own property lien status and encumbrances",
+          "File dispute claims against contested property records",
+          "Upload evidence and legal supporting documents",
+          "Receive automated alerts upon case updates"
+        ],
+        routes: ["/workspace (Personal Position)", "/cases (Own Cases)"]
+      },
+      bank: {
+        title: "Bank & Lender Workspace",
+        badge: "Institutional",
+        color: "blue",
+        description: "Specialized for loan servicing officers, title verification teams, and risk analysts tracking property securities.",
+        capabilities: [
+          "Portfolio-wide secured interest monitoring",
+          "Cross-property collateral risk evaluations",
+          "Institutional claim filing and response submission",
+          "Batch case updates for mortgage accounts"
+        ],
+        routes: ["/workspace (Portfolio Review)", "/cases (Portfolio Cases)"]
+      },
+      authority: {
+        title: "Legal Authority Workspace",
+        badge: "Government & Judicial",
+        color: "indigo",
+        description: "Operational clearinghouse for public registrars, county clerks, and administrative judges resolving property claims.",
+        capabilities: [
+          "Full visibility into regional dispute queues",
+          "Evidence verification and claim adjudication",
+          "Lifecycle state transition authority (OPEN -> RESOLVED)",
+          "Legal claim validation and discharge recording"
+        ],
+        routes: ["/workspace (Operational Queue)", "/cases (All Regional Cases)"]
+      },
+      admin: {
+        title: "Access Governance Workspace",
+        badge: "Administrative",
+        color: "purple",
+        description: "Platform security administrators managing user identities, role assignments, and cryptographic audit logs.",
+        capabilities: [
+          "System user role assignment & elevation",
+          "Self-modification lockout protection",
+          "Immutable role change audit trail inspection",
+          "System-wide compliance monitoring"
+        ],
+        routes: ["/admin/users (User Governance)", "/workspace (Governance Overview)", "/cases"]
+      }
+    };
+
+    function selectRole(roleKey) {
+      document.querySelectorAll('.role-btn').forEach(btn => {
+        btn.className = 'role-btn px-5 py-2.5 rounded-xl font-semibold text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700';
+      });
+      const activeBtn = document.getElementById('tab-' + roleKey);
+      if (activeBtn) {
+        activeBtn.className = 'role-btn px-5 py-2.5 rounded-xl font-semibold text-sm transition bg-sky-600 text-white shadow-lg shadow-sky-600/30';
+      }
+
+      const role = roleData[roleKey];
+      const container = document.getElementById('role-display-card');
+      container.innerHTML = `
+        <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+          <div>
+            <span class="text-xs uppercase font-bold tracking-wider text-sky-400">${role.badge}</span>
+            <h3 class="text-2xl font-extrabold text-white mt-1">${role.title}</h3>
+          </div>
+          <div class="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center">
+            <i data-lucide="shield" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <p class="text-sm text-slate-300 my-4">${role.description}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          <div>
+            <h4 class="text-xs uppercase font-bold tracking-wider text-slate-400 mb-3">Authorized Actions</h4>
+            <ul class="space-y-2 text-xs text-slate-300">
+              ${role.capabilities.map(c => `<li class="flex items-center gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i><span>${c}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-xs uppercase font-bold tracking-wider text-slate-400 mb-3">Accessible Routes</h4>
+            <ul class="space-y-2 text-xs font-mono text-sky-300">
+              ${role.routes.map(r => `<li class="p-2 rounded-lg bg-slate-950/60 border border-slate-800">${r}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function copyCode(btn, text) {
+      navigator.clipboard.writeText(text);
+      const icon = btn.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', 'check');
+        lucide.createIcons();
+        setTimeout(() => {
+          icon.setAttribute('data-lucide', 'copy');
+          lucide.createIcons();
+        }, 2000);
+      }
+    }
+
+    // Initialize with default role
+    selectRole('citizen');
+  </script>
+</body>
+</html>

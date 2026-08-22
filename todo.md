@@ -42,3 +42,38 @@
 - [x] Copy the completed LienGuard project source to the connected local LienGuard folder.
 - [x] Create a new private GitHub repository for the completed LienGuard source.
 - [x] Push the latest project source to the new private GitHub repository and verify the result.
+- [x] Retrieve and compare the complete source from the private GitHub repository.
+- [x] Define a new end-to-end navigation, information hierarchy, and visual design system.
+- [x] Redesign the public landing experience, authenticated workspace shell, Case Management, and administrator user-management interfaces.
+- [x] Validate the redesigned desktop and mobile journeys, loading/error states, automated tests, and production build.
+- [ ] Verify redesigned desktop and mobile route journeys with inspectable in-browser evidence.
+- [ ] Exercise the redesigned Case Management error and retry flow with inspectable evidence.
+- [ ] Capture authenticated redesigned workspace, cases, and access-governance browser evidence.
+- [ ] Push the complete UI and UX redesign to the private GitHub repository and verify the update.
+- [ ] Verify that the private GitHub repository HEAD matches the latest redesigned local commit after push.
+- [x] Extend the case data model with the minimum fields needed for the guided case journey, including bank, lien amount, authority, reference identifiers, and response deadline.
+- [x] Add secure case procedures for viewing an individual case and its journey data.
+- [x] Create a judge-ready dashboard with case health, action-required work, and clear next steps.
+- [x] Redesign the case register as a compact, information-dense table with direct case entry points.
+- [x] Build a case detail hero, timeline, communications, escalation, and RTI document-generation workflow.
+- [x] Update navigation so the core case journey is discoverable without hunting through screens.
+- [x] Implement case-specific communication storage, secure procedures, history, and a working follow-up action.
+- [x] Implement escalation and RTI views that are driven by real case state and deadline data.
+- [x] Register working destinations for Timeline, Communications, Documents, Escalations, and RTI Assistant without dead or duplicate navigation.
+- [x] Wire communication history and follow-up recording into the visible case-detail workflow.
+- [x] Restrict RTI drafting to cases whose actual deadline or escalation state makes it appropriate and derive the stated reason from that case state.
+- [x] Replace the Case Detail placeholder with the real communication history and a working follow-up action.
+- [ ] Verify immediate communication-history updates from the Case Detail follow-up action in the browser.
+- [ ] Verify visible communication history and immediate follow-up recording in the browser.
+- [x] Re-verify every case-management navigation entry in-browser with no placeholder-only or 404 outcomes.
+- [x] Add route-specific Timeline and Documents interactions beyond the generic case worklist shell.
+- [x] Verify every case-management navigation route with inspectable live browser route and content evidence.
+- [ ] Fix case creation so completed case details register successfully and field-level validation errors remain concise and actionable.
+- [x] Make the sign-out control clearly visible on desktop and mobile layouts and verify that it reliably ends the authenticated session.
+- [x] Exercise the visible sign-out action and verify in a live browser that the authenticated session returns to the secure sign-in state.
+- [x] Add a visible light/dark theme toggle with persisted user preference and accessible dark styling across the case workspace.
+- [x] Verify dark-mode contrast and legibility across all key case-management routes and refine any route-specific styling that needs it.
+- [x] Validate the screenshot-ready desktop and mobile case journeys, including empty, loading, and recovery states.
+- [ ] Exercise the redesigned desktop and mobile case journeys with inspectable live-browser route evidence.
+- [ ] Verify the redesigned Timeline, Documents, Communications, and Case Detail loading, empty, and recovery states with inspectable evidence.
+- [ ] Push the guided case journey redesign to the private GitHub repository and verify the remote commit.

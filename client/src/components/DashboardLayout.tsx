@@ -1,111 +1,31 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { isAdministrator } from "@/lib/roleAccess";
 import { trpc } from "@/lib/trpc";
-import { Bell, Building2, ChevronRight, FolderKanban, LayoutDashboard, LogOut, PanelLeft, ShieldCheck, Users } from "lucide-react";
+import { Bell, ChevronRight, FileText, FolderKanban, Gavel, LayoutDashboard, LogOut, MessageSquareText, ShieldCheck, UserCog, WandSparkles } from "lucide-react";
+import type { ReactNode } from "react";
 import { useLocation } from "wouter";
 
-const roleName = { citizen: "Citizen", bank: "Bank", authority: "Authority", admin: "Administrator" } as const;
+const roleNames = { citizen: "Citizen", bank: "Bank", authority: "Authority", admin: "Administrator" } as const;
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { loading, user, logout } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
   const { data: notifications = [] } = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(user) });
-  const markRead = trpc.notifications.markRead.useMutation({
-    onSuccess: () => utils.notifications.list.invalidate(),
-  });
+  const markRead = trpc.notifications.markRead.useMutation({ onSuccess: () => utils.notifications.list.invalidate() });
+  const handleSignOut = async () => { try { await logout(); } finally { navigate("/workspace"); } };
 
-  if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#101b31] px-6 text-white" aria-label="Loading protected workspace">
-        <div className="text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#9fe2d3] text-[#101b31] shadow-[0_18px_50px_rgba(0,0,0,0.3)]">
-            <ShieldCheck className="h-6 w-6 animate-pulse" />
-          </div>
-          <p className="mt-6 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[#9fe2d3]">Verifying access</p>
-          <p className="mt-2 text-sm text-slate-400">Establishing your protected LienGuard session.</p>
-        </div>
-      </main>
-    );
-  }
+  if (loading) return <main className="grid min-h-screen place-items-center bg-[#f4f6f8]"><div className="text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-5 w-5 animate-pulse" /></span><p className="mt-5 text-sm font-semibold text-[#163453]">Preparing your secure workspace</p></div></main>;
+  if (!user) return <main className="grid min-h-screen place-items-center bg-[#f4f6f8] px-5"><section className="w-full max-w-md rounded-2xl border border-[#dce3eb] bg-white p-8 shadow-xl"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-5 w-5" /></span><p className="eyebrow mt-6 text-[#557087]">LienGuard secure workspace</p><h1 className="font-display mt-2 text-4xl text-[#132f4d]">Sign in to see your cases.</h1><p className="mt-4 text-sm leading-6 text-[#65758a]">Use your Manus account to access the protected case workspace assigned to you.</p><Button onClick={() => startLogin()} className="mt-7 h-11 w-full bg-[#0f2b4b] hover:bg-[#183c63]">Continue with Manus <ChevronRight className="ml-1 h-4 w-4" /></Button></section></main>;
 
-  if (!user) {
-    return (
-      <main className="min-h-screen bg-[#101b31] px-6 py-10 text-white grid place-items-center">
-        <section className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white/[0.07] p-8 text-center shadow-2xl backdrop-blur">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#9fe2d3] text-[#101b31]"><ShieldCheck className="h-6 w-6" /></div>
-          <p className="mt-6 font-mono text-[0.68rem] uppercase tracking-[0.2em] text-[#9fe2d3]">Protected workspace</p>
-          <h1 className="font-display mt-3 text-4xl">Sign in to continue.</h1>
-          <p className="mt-4 leading-7 text-slate-300">Use your secure Manus account to access the LienGuard workspace assigned to you.</p>
-          <Button onClick={() => startLogin()} className="mt-8 w-full bg-[#9fe2d3] text-[#101b31] hover:bg-[#c0f0e4]">Continue with Manus <ChevronRight className="ml-1 h-4 w-4" /></Button>
-        </section>
-      </main>
-    );
-  }
+  const primary = [{ label: "Dashboard", href: "/workspace", icon: LayoutDashboard }, { label: "My Cases", href: "/cases", icon: FolderKanban }, { label: "Timeline", href: "/timeline", icon: Gavel }, { label: "Communications", href: "/communications", icon: MessageSquareText }, { label: "Documents", href: "/documents", icon: FileText }, { label: "Escalations", href: "/escalations", icon: Gavel }, { label: "RTI Assistant", href: "/rti", icon: WandSparkles }];
+  const initials = user.name?.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase() || "LG";
+  const unread = notifications.filter(item => !item.readAt).length;
+  const navIsActive = (_label: string, href: string) => location === href || (href === "/cases" && location.startsWith("/cases/"));
 
-  const navItems = [
-    { label: "Workspace", icon: LayoutDashboard, href: "/workspace" },
-    { label: "Case register", icon: FolderKanban, href: "/cases" },
-    ...(isAdministrator(user.role) ? [{ label: "User access", icon: Users, href: "/admin/users" }] : []),
-  ];
-  const unreadCount = notifications.filter(notification => !notification.readAt).length;
-
-  return (
-    <SidebarProvider>
-      <Sidebar className="border-r-0 bg-[#101b31] text-slate-100">
-        <SidebarHeader className="h-[5.5rem] px-4 pt-5">
-          <button onClick={() => navigate("/workspace")} className="flex items-center gap-3 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9fe2d3]">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#9fe2d3] text-[#101b31] shadow-lg shadow-black/20"><ShieldCheck className="h-5 w-5" /></span>
-            <span className="min-w-0 group-data-[collapsible=icon]:hidden"><span className="block font-display text-xl leading-none">LienGuard</span><span className="mt-1 block font-mono text-[0.56rem] uppercase tracking-[0.18em] text-slate-400">Secure access</span></span>
-          </button>
-        </SidebarHeader>
-        <SidebarContent className="px-3 pt-3">
-          <p className="px-3 pb-2 font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500 group-data-[collapsible=icon]:hidden">Navigation</p>
-          <SidebarMenu>
-            {navItems.map(item => <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton onClick={() => navigate(item.href)} isActive={location.pathname === item.href} tooltip={item.label} className="h-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white data-[active=true]:bg-[#9fe2d3] data-[active=true]:text-[#101b31]">
-                <item.icon className="h-4 w-4" /><span>{item.label}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>)}
-          </SidebarMenu>
-          <div className="mx-2 mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-4 group-data-[collapsible=icon]:hidden">
-            <Building2 className="h-4 w-4 text-[#9fe2d3]" />
-            <p className="mt-4 text-sm font-medium">Access with accountability.</p>
-            <p className="mt-1 text-xs leading-5 text-slate-400">Permission changes are recorded and shared with the affected user.</p>
-          </div>
-        </SidebarContent>
-        <SidebarFooter className="p-3">
-          <div className="rounded-2xl bg-white/[0.07] p-2 group-data-[collapsible=icon]:bg-transparent">
-            <div className="flex items-center gap-3 px-1 py-1 group-data-[collapsible=icon]:justify-center">
-              <Avatar className="h-9 w-9 border border-white/10"><AvatarFallback className="bg-[#264261] text-xs text-white">{user.name?.charAt(0).toUpperCase() ?? "U"}</AvatarFallback></Avatar>
-              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-medium">{user.name || "LienGuard user"}</p><p className="mt-0.5 truncate text-xs text-slate-400">{roleName[user.role]}</p></div>
-            </div>
-            <Button variant="ghost" onClick={logout} className="mt-1 h-9 w-full justify-start px-2 text-slate-400 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:hidden"><LogOut className="mr-2 h-4 w-4" />Sign out</Button>
-          </div>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="bg-[#f7f6f2]">
-        <header className="flex h-[5.5rem] items-center justify-between border-b border-[#dfe3e7] bg-[#f7f6f2]/90 px-5 backdrop-blur sm:px-8">
-          <div className="flex items-center gap-3"><SidebarTrigger className="rounded-xl text-[#20314c] hover:bg-[#e8ecec]" /><div className="hidden sm:block"><p className="font-mono text-[0.61rem] uppercase tracking-[0.18em] text-[#607089]">Access level</p><p className="mt-1 text-sm font-medium text-[#20314c]">{roleName[user.role]}</p></div></div>
-          <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><button className="relative grid h-10 w-10 place-items-center rounded-xl border border-[#d7dee3] bg-white text-[#20314c] transition hover:border-[#9ab7c1] hover:bg-[#f1f8f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#377a8e]" aria-label="Open notifications"><Bell className="h-4 w-4" />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#dd6e54] px-1 text-[0.65rem] font-bold text-white">{unreadCount}</span>}</button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[22rem] rounded-2xl p-2 shadow-xl">
-                <DropdownMenuLabel className="px-3 py-2 text-sm">Access notifications</DropdownMenuLabel><DropdownMenuSeparator />
-                {notifications.length === 0 ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">No access notifications yet.</p> : notifications.slice(0, 5).map(notification => <DropdownMenuItem key={notification.id} onSelect={() => { if (!notification.readAt) markRead.mutate({ notificationId: notification.id }); }} className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-3 whitespace-normal focus:bg-[#eef7f6]"><span className="flex w-full items-center justify-between gap-3 font-medium"><span>{notification.title}</span>{!notification.readAt && <Badge className="border-0 bg-[#cfeee7] text-[#1d5d62]">New</Badge>}</span><span className="text-xs leading-5 text-muted-foreground">{notification.message}</span></DropdownMenuItem>)}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="hidden h-10 items-center gap-2 rounded-xl border border-[#d7dee3] bg-white px-3 sm:flex"><span className="h-2 w-2 rounded-full bg-[#4d9d8c]" /><span className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-[#52627a]">Verified session</span></div>
-          </div>
-        </header>
-        <main className="min-h-[calc(100vh-5.5rem)] p-5 sm:p-8">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
-  );
+  return <div className="min-h-screen bg-[#f4f6f8] text-[#132f4d]"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#dce3eb] bg-white px-4 md:px-6"><button onClick={() => navigate("/workspace")} className="flex items-center gap-3 text-left"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-4 w-4" /></span><span className="hidden sm:block"><span className="block text-sm font-extrabold tracking-tight">LienGuard</span><span className="eyebrow block text-[0.48rem] text-[#7b8b9c]">Secure case management</span></span></button><div className="flex items-center gap-2"><DropdownMenu><DropdownMenuTrigger asChild><button aria-label="Open notifications" className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#dce3eb] text-[#405a73]"><Bell className="h-4 w-4" />{unread > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#c7493a] px-1 text-[0.56rem] font-bold text-white">{unread}</span>}</button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-80 rounded-xl p-2"><DropdownMenuLabel>Notifications</DropdownMenuLabel><DropdownMenuSeparator />{notifications.length ? notifications.slice(0, 5).map(item => <DropdownMenuItem key={item.id} onSelect={() => { if (!item.readAt) markRead.mutate({ notificationId: item.id }); }} className="flex cursor-pointer flex-col items-start gap-1 rounded-lg py-3 whitespace-normal"><span className="font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">{item.message}</span></DropdownMenuItem>) : <p className="p-5 text-center text-sm text-muted-foreground">No new notifications.</p>}</DropdownMenuContent></DropdownMenu><Button variant="outline" onClick={handleSignOut} className="h-9 gap-2 rounded-lg border-[#dce3eb] px-3 text-xs font-bold text-[#264966] hover:bg-[#f3f6f9]"><LogOut className="h-3.5 w-3.5" /><span>Sign out</span></Button><div className="hidden items-center gap-2 border-l border-[#e2e7ed] pl-3 sm:flex"><Avatar className="h-8 w-8"><AvatarFallback className="bg-[#e5eef8] text-xs font-bold text-[#224f79]">{initials}</AvatarFallback></Avatar><div className="text-left"><p className="max-w-32 truncate text-xs font-bold">{user.name || "LienGuard user"}</p><p className="text-[0.66rem] text-[#75869a]">{roleNames[user.role]}</p></div></div></div></header><div className="flex"><aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-60 shrink-0 border-r border-[#dce3eb] bg-white p-4 lg:block"><p className="eyebrow px-3 pt-2 text-[#8290a0]">Workspace</p><nav className="mt-3 space-y-1">{primary.map(item => <button key={item.label} onClick={() => navigate(item.href)} className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold transition ${navIsActive(item.label, item.href) ? "bg-[#e8f0fa] text-[#124b79]" : "text-[#5a6c80] hover:bg-[#f1f4f7] hover:text-[#173e62]"}`}><item.icon className="h-4 w-4" />{item.label}</button>)}</nav>{isAdministrator(user.role) && <><p className="eyebrow mt-8 px-3 text-[#8290a0]">Administration</p><button onClick={() => navigate("/admin/users")} className={`mt-3 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold ${location === "/admin/users" ? "bg-[#e8f0fa] text-[#124b79]" : "text-[#5a6c80] hover:bg-[#f1f4f7]"}`}><UserCog className="h-4 w-4" />User access</button></>}<div className="absolute inset-x-4 bottom-4 rounded-xl bg-[#0f2b4b] p-4 text-white"><p className="eyebrow text-[#bed8f4]">Secure session</p><p className="mt-2 text-xs leading-5 text-[#c8d7e8]">Server-enforced access and traceable role changes.</p><Button variant="ghost" onClick={handleSignOut} className="mt-3 h-8 w-full justify-start px-2 text-[#dce9f6] hover:bg-white/10 hover:text-white"><LogOut className="mr-2 h-3.5 w-3.5" />Sign out</Button></div></aside><main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main></div><nav className="sticky bottom-0 z-30 flex items-center gap-1 overflow-x-auto border-t border-[#dce3eb] bg-white p-2 lg:hidden">{primary.slice(0, 4).map(item => <button key={item.label} onClick={() => navigate(item.href)} className={`flex min-w-20 flex-col items-center gap-1 rounded-lg px-3 py-2 text-[0.62rem] font-bold ${navIsActive(item.label, item.href) ? "bg-[#e8f0fa] text-[#124b79]" : "text-[#78889a]"}`}><item.icon className="h-4 w-4" />{item.label}</button>)}<button onClick={handleSignOut} className="ml-auto flex min-w-16 flex-col items-center gap-1 rounded-lg px-2 py-2 text-[0.62rem] font-bold text-[#a54e41]"><LogOut className="h-4 w-4" />Sign out</button></nav></div>;
 }
