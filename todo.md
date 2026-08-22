@@ -48,8 +48,8 @@
 - [ ] Verify redesigned desktop and mobile route journeys with inspectable in-browser evidence.
 - [ ] Exercise the redesigned Case Management error and retry flow with inspectable evidence.
 - [ ] Capture authenticated redesigned workspace, cases, and access-governance browser evidence.
-- [ ] Push the complete UI and UX redesign to the private GitHub repository and verify the update.
-- [ ] Verify that the private GitHub repository HEAD matches the latest redesigned local commit after push.
+- [x] Push the complete UI and UX redesign to the private GitHub repository and verify the update.
+- [x] Verify that the private GitHub repository HEAD matches the latest redesigned local commit after push.
 - [x] Extend the case data model with the minimum fields needed for the guided case journey, including bank, lien amount, authority, reference identifiers, and response deadline.
 - [x] Add secure case procedures for viewing an individual case and its journey data.
 - [x] Create a judge-ready dashboard with case health, action-required work, and clear next steps.
@@ -75,4 +75,5 @@
 - [x] Validate the screenshot-ready desktop and mobile case journeys, including empty, loading, and recovery states.
 - [ ] Exercise the redesigned desktop and mobile case journeys with inspectable live-browser route evidence.
 - [ ] Verify the redesigned Timeline, Documents, Communications, and Case Detail loading, empty, and recovery states with inspectable evidence.
-- [ ] Push the guided case journey redesign to the private GitHub repository and verify the remote commit.
+- [x] Push the guided case journey redesign to the private GitHub repository and verify the remote commit.
+- [ ] Synchronize the latest redesign source to the connected local LienGuard folder.
