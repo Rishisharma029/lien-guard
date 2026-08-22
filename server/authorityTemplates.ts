@@ -1,5 +1,18 @@
 import type { Case } from "../drizzle/schema";
 
+export type ExtendedCaseRecord = Case & {
+  lienAmount?: string | null;
+  bankName?: string | null;
+  branchName?: string | null;
+  accountNumber?: string | null;
+  ifscCode?: string | null;
+  disputeRefNumber?: string | null;
+  ncrpAckNumber?: string | null;
+  firNumber?: string | null;
+  freezingAuthority?: string | null;
+  [key: string]: any;
+};
+
 export function formatInr(amount: string | null | undefined): string {
   if (!amount) return "₹0";
   const num = Number(amount.replace(/[^0-9.-]+/g, ""));
@@ -8,7 +21,7 @@ export function formatInr(amount: string | null | undefined): string {
 }
 
 export function generateInitialNotice(input: {
-  caseRecord: Case;
+  caseRecord: ExtendedCaseRecord;
   citizenName: string;
   citizenEmail?: string | null;
 }) {
@@ -64,7 +77,7 @@ LienGuard Citizen Reference: ${caseRecord.caseId}
 }
 
 export function generateFollowUpReminder(input: {
-  caseRecord: Case;
+  caseRecord: ExtendedCaseRecord;
   citizenName: string;
   reminderNumber: number;
 }) {
@@ -108,7 +121,7 @@ Case ID: ${caseRecord.caseId}
 }
 
 export function generateTier2Escalation(input: {
-  caseRecord: Case;
+  caseRecord: ExtendedCaseRecord;
   citizenName: string;
 }) {
   const { caseRecord, citizenName } = input;
@@ -133,7 +146,7 @@ I am formally escalating the matter of an unresolved bank lien / debit freeze of
 - Account Number: ${caseRecord.accountNumber || "N/A"}
 - NCRP Complaint / FIR Ref: ${caseRecord.ncrpAckNumber || caseRecord.firNumber || "N/A"}
 - Initial Representation Date: ${caseRecord.noticeSentAt ? new Date(caseRecord.noticeSentAt).toLocaleDateString("en-IN") : "Earlier"}
-- Follow-up Reminders Sent: ${caseRecord.reminderCount}
+- Follow-up Reminders Sent: ${caseRecord.reminderCount || 0}
 
 Despite prior notices and reminders, no formal communication or investigation findings have been furnished by the local branch / investigating unit.
 
@@ -153,7 +166,7 @@ LienGuard Escalation Ref: ${caseRecord.caseId}
 }
 
 export function generateTier3Escalation(input: {
-  caseRecord: Case;
+  caseRecord: ExtendedCaseRecord;
   citizenName: string;
 }) {
   const { caseRecord, citizenName } = input;
@@ -194,7 +207,7 @@ LienGuard Dossier ID: ${caseRecord.caseId}
 }
 
 export function generateRtiDraft(input: {
-  caseRecord: Case;
+  caseRecord: ExtendedCaseRecord;
   citizenName: string;
   citizenAddress?: string;
 }) {
