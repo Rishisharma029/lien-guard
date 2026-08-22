@@ -154,9 +154,10 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || "lienguard-secure-jwt-session-secret-key-32-chars-min";
     return new TextEncoder().encode(secret);
   }
+
 
   /**
    * Create a session token for a Manus user openId

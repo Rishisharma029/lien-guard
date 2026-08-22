@@ -92,16 +92,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Sidebar>
       <SidebarInset className="bg-[#f7f6f2]">
         <header className="flex h-[5.5rem] items-center justify-between border-b border-[#dfe3e7] bg-[#f7f6f2]/90 px-5 backdrop-blur sm:px-8">
-          <div className="flex items-center gap-3"><SidebarTrigger className="rounded-xl text-[#20314c] hover:bg-[#e8ecec]" /><div className="hidden sm:block"><p className="font-mono text-[0.61rem] uppercase tracking-[0.18em] text-[#607089]">Access level</p><p className="mt-1 text-sm font-medium text-[#20314c]">{roleName[user.role]}</p></div></div>
+          <div className="flex items-center gap-3">
+            <SidebarTrigger className="rounded-xl text-[#20314c] hover:bg-[#e8ecec]" />
+            <div className="hidden sm:block">
+              <p className="font-mono text-[0.61rem] uppercase tracking-[0.18em] text-[#607089]">Access level</p>
+              <p className="mt-1 text-sm font-medium text-[#20314c]">{roleName[user.role]}</p>
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><button className="relative grid h-10 w-10 place-items-center rounded-xl border border-[#d7dee3] bg-white text-[#20314c] transition hover:border-[#9ab7c1] hover:bg-[#f1f8f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#377a8e]" aria-label="Open notifications"><Bell className="h-4 w-4" />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#dd6e54] px-1 text-[0.65rem] font-bold text-white">{unreadCount}</span>}</button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[22rem] rounded-2xl p-2 shadow-xl">
-                <DropdownMenuLabel className="px-3 py-2 text-sm">Access notifications</DropdownMenuLabel><DropdownMenuSeparator />
-                {notifications.length === 0 ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">No access notifications yet.</p> : notifications.slice(0, 5).map(notification => <DropdownMenuItem key={notification.id} onSelect={() => { if (!notification.readAt) markRead.mutate({ notificationId: notification.id }); }} className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-3 whitespace-normal focus:bg-[#eef7f6]"><span className="flex w-full items-center justify-between gap-3 font-medium"><span>{notification.title}</span>{!notification.readAt && <Badge className="border-0 bg-[#cfeee7] text-[#1d5d62]">New</Badge>}</span><span className="text-xs leading-5 text-muted-foreground">{notification.message}</span></DropdownMenuItem>)}
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex h-10 items-center gap-2 rounded-xl border border-[#d7dee3] bg-white px-3 text-xs font-medium text-[#20314c] transition hover:bg-[#f1f8f7]"
+                  title="Switch test role"
+                >
+                  <span className="h-2 w-2 rounded-full bg-[#4d9d8c]" />
+                  <span className="hidden sm:inline text-[#607089]">Persona:</span>
+                  <span className="font-semibold">{roleName[user.role]}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-xl">
+                <DropdownMenuLabel className="px-2 py-1 font-mono text-[0.62rem] uppercase tracking-wider text-muted-foreground">
+                  Switch Persona (Demo)
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(["citizen", "bank", "authority", "admin"] as const).map(r => (
+                  <DropdownMenuItem
+                    key={r}
+                    onSelect={() => {
+                      window.location.href = `/api/auth/dev-login?role=${r}`;
+                    }}
+                    className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-xs font-medium focus:bg-[#eef7f6]"
+                  >
+                    <span>{roleName[r]}</span>
+                    {user.role === r && (
+                      <Badge className="border-0 bg-[#cfeee7] text-[#1d5d62] text-[0.62rem]">Active</Badge>
+                    )}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <div className="hidden h-10 items-center gap-2 rounded-xl border border-[#d7dee3] bg-white px-3 sm:flex"><span className="h-2 w-2 rounded-full bg-[#4d9d8c]" /><span className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-[#52627a]">Verified session</span></div>
           </div>
         </header>
         <main className="min-h-[calc(100vh-5.5rem)] p-5 sm:p-8">{children}</main>
@@ -109,3 +139,4 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </SidebarProvider>
   );
 }
+

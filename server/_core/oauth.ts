@@ -4,6 +4,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import type { LienGuardRole } from "../../drizzle/schema";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -11,6 +12,53 @@ function getQueryParam(req: Request, key: string): string | undefined {
 }
 
 export function registerOAuthRoutes(app: Express) {
+  // Local development / standalone login endpoint
+  app.get("/api/auth/dev-login", async (req: Request, res: Response) => {
+    const roleParam = (req.query.role as string) || "citizen";
+    const validRoles: LienGuardRole[] = ["citizen", "bank", "authority", "admin"];
+    const role: LienGuardRole = validRoles.includes(roleParam as LienGuardRole) ? (roleParam as LienGuardRole) : "citizen";
+
+    const roleNames: Record<LienGuardRole, string> = {
+      citizen: "Aarav Sharma (Citizen)",
+      bank: "SBI Branch Manager (Bank)",
+      authority: "Cyber Crime Cell IO (Authority)",
+      admin: "Platform Administrator",
+    };
+
+    const openId = `local-${role}-user`;
+    const name = roleNames[role];
+    const email = `${role}@lienguard.in`;
+
+    await db.upsertUser({
+      openId,
+      name,
+      email,
+      loginMethod: "local",
+      lastSignedIn: new Date(),
+    });
+
+    const user = await db.getUserByOpenId(openId);
+    if (user && user.role !== role) {
+      const database = await db.getDb();
+      if (database) {
+        const { users } = await import("../../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        await database.update(users).set({ role }).where(eq(users.openId, openId));
+      }
+    }
+
+    const sessionToken = await sdk.createSessionToken(openId, {
+      name,
+      expiresInMs: ONE_YEAR_MS,
+    });
+
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+    const redirectTo = (req.query.redirect as string) || "/workspace";
+    res.redirect(302, redirectTo);
+  });
+
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");
@@ -56,10 +104,11 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.redirect(302, "/");
+      res.redirect(302, "/workspace");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });
 }
+
