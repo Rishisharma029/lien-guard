@@ -38,7 +38,6 @@
 - [x] Verify client-side in-app navigation without entering the OAuth sign-in flow.
 - [x] Add tRPC tests for Case lifecycle updates and case-access ownership enforcement.
 - [x] Verify the authenticated Case Management error card and retry action in a live browser session.
-- [x] Capture inspectable authenticated Case Management preview evidence after final validation.
-- [ ] Copy the completed LienGuard project source to the connected local LienGuard folder.
-- [ ] Create a new private GitHub repository for the completed LienGuard source.
-- [ ] Push the latest project source to the new private GitHub repository and verify the result.
+- [x] Copy the completed LienGuard project source to the connected local LienGuard folder.
+- [x] Create a new GitHub repository for the completed LienGuard source.
+- [x] Push the latest project source to the GitHub repository and verify the result.
