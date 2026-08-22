@@ -19,12 +19,13 @@ import {
   recordCaseFollowUp,
   setCaseStatus,
   updateCaseDetails,
+  upsertUser,
 } from "./db";
 import { decodeCaseDocument } from "./documents";
 import { deliverQueuedCommunication } from "./automation";
 import { isValidEmailAddress } from "./maileroo";
 import { storageGetSignedUrl, storagePut } from "./storage";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
@@ -131,7 +132,7 @@ export const appRouter = router({
         const openId = `demo-${role}`;
         const name = roleNames[role] || "LienGuard User";
 
-        await db.upsertUser({
+        await upsertUser({
           openId,
           name,
           email: `${role}@lienguard.dev`,
