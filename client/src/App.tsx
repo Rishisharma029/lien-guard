@@ -22,6 +22,7 @@ const Timeline = lazy(() => import("@/pages/Timeline"));
 const HackathonDemo = lazy(() => import("@/pages/HackathonDemo"));
 
 const AuthorityDirectory = lazy(() => import("@/pages/AuthorityDirectory"));
+const CyberDirectory = lazy(() => import("@/pages/CyberDirectory"));
 
 function PageLoading() {
   return <main className="grid min-h-screen place-items-center bg-background text-sm font-medium text-muted-foreground">Loading secure workspace…</main>;
@@ -37,6 +38,10 @@ function UserManagementRoute() {
 
 function AuthorityDirectoryRoute() {
   return <DashboardLayout><AuthorityDirectory /></DashboardLayout>;
+}
+
+function CyberDirectoryRoute() {
+  return <DashboardLayout><CyberDirectory /></DashboardLayout>;
 }
 
 function CasesRoute() {
@@ -64,6 +69,8 @@ function Router() {
         <Route path="/preview" component={StaticPreview} />
         <Route path="/workspace" component={WorkspaceRoute} />
         <Route path="/demo" component={DemoRoute} />
+        <Route path="/directory" component={CyberDirectoryRoute} />
+        <Route path="/cybercrime-directory" component={CyberDirectoryRoute} />
         <Route path="/cases" component={CasesRoute} />
         <Route path="/cases/:caseId" component={CaseDetailRoute} />
         <Route path="/timeline" component={TimelineRoute} />

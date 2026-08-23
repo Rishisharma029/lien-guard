@@ -596,6 +596,33 @@ export const appRouter = router({
         return assignment || null;
       }),
 
+    /** Browse active official authorities (available to all users). */
+    browse: protectedProcedure
+      .input(z.object({
+        stateUt: z.string().trim().min(1).max(100).optional(),
+        authorityType: z.enum(authorityTypes).optional(),
+        search: z.string().trim().max(100).optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const records = await listAuthorityDirectory({
+          stateUt: input?.stateUt,
+          authorityType: input?.authorityType,
+          activeOnly: true,
+        });
+        if (input?.search) {
+          const q = input.search.toLowerCase();
+          return records.filter(r =>
+            r.stateUt.toLowerCase().includes(q) ||
+            r.authorityName.toLowerCase().includes(q) ||
+            (r.officerName && r.officerName.toLowerCase().includes(q)) ||
+            (r.officialEmail && r.officialEmail.toLowerCase().includes(q)) ||
+            (r.phone && r.phone.toLowerCase().includes(q)) ||
+            (r.designation && r.designation.toLowerCase().includes(q))
+          );
+        }
+        return records;
+      }),
+
     /** Admin: list all authority directory entries. */
     list: adminProcedure
       .input(z.object({

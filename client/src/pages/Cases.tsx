@@ -93,10 +93,15 @@ function FieldError({ children }: { children?: string }) {
 
 function CreateCase() {
   const utils = trpc.useUtils();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => {
+    return Boolean(typeof window !== "undefined" && new URLSearchParams(window.location.search).get("stateUt"));
+  });
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [form, setForm] = useState<CaseForm>(initialCaseForm);
+  const [form, setForm] = useState<CaseForm>(() => {
+    const param = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("stateUt") : null;
+    return param ? { ...initialCaseForm, stateUt: param } : initialCaseForm;
+  });
 
   // Authority recommendation query
   const routingQuery = trpc.authorityDirectory.recommend.useQuery(

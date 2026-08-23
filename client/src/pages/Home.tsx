@@ -53,6 +53,9 @@ export default function Home() {
           <span><span className="block text-lg font-extrabold tracking-tight">LienGuard</span><span className="eyebrow mt-0.5 block text-[0.51rem] text-[#aab7cc]">Case intelligence</span></span>
         </button>
         <div className="flex items-center gap-3">
+          <Button disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("citizen", "/directory")} variant="outline" className="border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:text-sky-200">
+            🏛️ Cyber Directory
+          </Button>
           <Button disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("citizen", "/demo")} variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200">
             ⚡ Hackathon Demo
           </Button>

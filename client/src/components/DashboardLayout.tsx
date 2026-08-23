@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { startLogin } from "@/const";
 import { isAdministrator } from "@/lib/roleAccess";
 import { trpc } from "@/lib/trpc";
-import { Bell, ChevronRight, FileText, FolderKanban, Gavel, LayoutDashboard, LogOut, MessageSquareText, ShieldCheck, UserCog, WandSparkles, Zap } from "lucide-react";
+import { Bell, ChevronRight, FileText, FolderKanban, Gavel, Landmark, LayoutDashboard, LogOut, MessageSquareText, ShieldCheck, UserCog, WandSparkles, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 import { useLocation } from "wouter";
 
@@ -32,6 +32,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const primary = [
     { label: "⚡ Hackathon Demo", href: "/demo", icon: Zap },
     { label: "Dashboard", href: "/workspace", icon: LayoutDashboard },
+    { label: "🏛️ Cyber Directory", href: "/directory", icon: Landmark },
     { label: "My Cases", href: "/cases", icon: FolderKanban },
     { label: "Timeline", href: "/timeline", icon: Gavel },
     { label: "Communications", href: "/communications", icon: MessageSquareText },
