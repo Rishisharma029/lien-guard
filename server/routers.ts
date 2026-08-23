@@ -7,7 +7,11 @@ import {
   createCase,
   createCaseDocument,
   createOutboundEmail,
+  createUserNotification,
+  getCaseById,
   getCaseByReference,
+  getCaseCommunicationById,
+  getLatestDemoCase,
   getNotificationsForUser,
   getRoleChangeAudits,
   listCaseCommunications,
@@ -16,18 +20,22 @@ import {
   listCasesForUser,
   listUsersForAdmin,
   markNotificationRead,
+  purgeDemoCases,
   recordCaseFollowUp,
+  recordInboundEmail,
+  recordSystemCaseEvent,
   setCaseStatus,
   updateCaseDetails,
   upsertUser,
 } from "./db";
+import { analyzeInboundReply } from "./replyIntelligence";
 import { decodeCaseDocument } from "./documents";
-import { deliverQueuedCommunication } from "./automation";
+import { deliverQueuedCommunication, runDeadlineAutomation } from "./automation";
 import { isValidEmailAddress } from "./maileroo";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { ENV } from "./_core/env";
+import { ENV, isMailerooConfigured } from "./_core/env";
 import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -118,10 +126,16 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    demoAvailable: publicProcedure.query(() => true),
+    demoAvailable: publicProcedure.query(() => !ENV.isProduction || ENV.localDemoMode),
     demoLogin: publicProcedure
       .input(z.object({ role: z.enum(userRoles).default("citizen") }).optional())
       .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Demo authentication is disabled in production.",
+          });
+        }
         const role = input?.role || "citizen";
         const roleNames: Record<string, string> = {
           citizen: "Citizen User",
@@ -297,6 +311,21 @@ export const appRouter = router({
         const delivery = await deliverQueuedCommunication(queued);
         return { communicationId: queued.id, delivery };
       }),
+    getReplyAnalysis: protectedProcedure
+      .input(z.object({ communicationId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const comm = await getCaseCommunicationById(input.communicationId);
+        if (!comm) throw new TRPCError({ code: "NOT_FOUND", message: "Communication not found" });
+        const caseRecord = await getCaseById(comm.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case not found" });
+        requireCaseAccess(ctx.user, caseRecord);
+        return analyzeInboundReply({
+          subject: comm.subject,
+          body: comm.body,
+          senderEmail: comm.recipientEmail || undefined,
+          caseId: caseRecord.caseId,
+        });
+      }),
   }),
   documents: router({
     list: protectedProcedure
@@ -400,6 +429,448 @@ export const appRouter = router({
           }
           throw error;
         }
+      }),
+  }),
+  demo: router({
+    isDemo: publicProcedure.query(() => !ENV.isProduction || ENV.localDemoMode),
+    getState: protectedProcedure.query(async ({ ctx }) => {
+      const demoCase = await getLatestDemoCase();
+      if (!demoCase) {
+        return {
+          hasCase: false,
+          case: null,
+          events: [],
+          communications: [],
+          step: 0,
+          emailDeliveryMode: ENV.emailDeliveryMode,
+          demoRecipients: Array.from(ENV.demoEmailRecipients),
+          isMailerooConfigured: isMailerooConfigured(),
+        };
+      }
+
+      const [events, communications, documents] = await Promise.all([
+        listCaseEvents(demoCase.id),
+        listCaseCommunications(demoCase.id),
+        listCaseDocuments(demoCase.id),
+      ]);
+
+      let step = 1; // 1: Registered
+      const hasFollowUp = communications.some(c => c.subject.includes("Formal Status Follow-up") || c.subject.includes("Follow-up"));
+      const hasBankEscalation = communications.some(c => c.subject.includes("Nodal Bank Escalation"));
+      const hasCyberEscalation = communications.some(c => c.subject.includes("Cybercrime Authority Escalation")) || demoCase.status === "ESCALATED";
+      const hasRtiDraft = documents.some(d => d.kind === "RTI_DRAFT");
+
+      if (hasFollowUp) step = 2;
+      if (hasBankEscalation) step = 3;
+      if (hasCyberEscalation) step = 4;
+      if (hasRtiDraft) step = 5;
+
+      const latestInbound = communications.find(c => c.direction === "inbound" || c.state === "received");
+      const latestInboundAnalysis = latestInbound
+        ? analyzeInboundReply({
+            subject: latestInbound.subject,
+            body: latestInbound.body,
+            senderEmail: latestInbound.recipientEmail || undefined,
+            caseId: demoCase.caseId,
+          })
+        : null;
+
+      return {
+        hasCase: true,
+        case: demoCase,
+        events,
+        communications,
+        documents,
+        step,
+        latestInboundAnalysis,
+        emailDeliveryMode: ENV.emailDeliveryMode,
+        demoRecipients: Array.from(ENV.demoEmailRecipients),
+        isMailerooConfigured: isMailerooConfigured(),
+      };
+    }),
+    registerDemoCase: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ENV.isProduction && !ENV.localDemoMode) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Demo mode is disabled in production." });
+      }
+
+      // Purge any existing demo cases first for a clean slate
+      await purgeDemoCases();
+
+      const authorityEmail = Array.from(ENV.demoEmailRecipients)[0] || "demo-authority@local.invalid";
+      const created = await createCase({
+        userId: ctx.user.id,
+        title: "[HACKATHON DEMO] Unauthorized Bank Account Lien — Case Investigation",
+        description: "Fictional cybercrime investigation lien placed on primary checking account following simulated suspicious P2P transfer report. Demo case for hackathon judges.",
+        caseType: "CYBER_CRIME_LIEN",
+        priority: "HIGH",
+        bankName: "Demo National Bank (Nodal Operations)",
+        lienAmount: "150000.00",
+        lienDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        lienReference: "LIEN-DEMO-2026-9812",
+        transactionReference: "TXN-DEMO-88492014",
+        authorityName: "Cyber Crime Investigation Cell (District Cyber Unit)",
+        authorityEmail,
+        responseDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        initialStatus: "AWAITING_RESPONSE",
+      });
+
+      if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create demo case." });
+      return { success: true, case: created };
+    }),
+    sendFollowUp: protectedProcedure
+      .input(z.object({ caseId: z.string().trim().min(4).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Demo mode is disabled in production." });
+        }
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!caseRecord.title.startsWith("[HACKATHON DEMO]")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This operation is only permitted on demo cases." });
+        }
+
+        const recipientEmail = Array.from(ENV.demoEmailRecipients)[0] || caseRecord.authorityEmail || "demo-authority@local.invalid";
+        const subject = `[${caseRecord.caseId}] [HACKATHON DEMO] Formal Status Follow-up on Lien Freezing Order`;
+        const body = [
+          "*** HACKATHON DEMONSTRATION NOTICE - CONTROLLED TEST ENVIRONMENT ***",
+          "",
+          `To: ${caseRecord.authorityName || "Cyber Crime Investigation Cell"}`,
+          `From: LienGuard Case Protection Desk`,
+          `Case Reference: ${caseRecord.caseId}`,
+          `Lien Reference: ${caseRecord.lienReference || "LIEN-DEMO-2026-9812"}`,
+          `Lien Amount: INR 1,50,000.00`,
+          "",
+          `Dear Officer,`,
+          "",
+          `This is a formal, recorded follow-up regarding LienGuard case ${caseRecord.caseId}: ${caseRecord.title}.`,
+          `The scheduled response deadline is recorded as ${caseRecord.responseDeadline?.toISOString().slice(0, 10) || "active"}.`,
+          `Please provide the current investigation status and confirmation of required compliance documentation.`,
+          "",
+          "This message was generated from the LienGuard audit workflow.",
+          "*** END HACKATHON DEMONSTRATION ***",
+        ].join("\n");
+
+        const communication = await createOutboundEmail({
+          caseRecordId: caseRecord.id,
+          recipientEmail,
+          subject,
+          body,
+          automated: true,
+          actorUserId: ctx.user.id,
+        });
+
+        if (!communication) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to queue communication." });
+        }
+
+        const delivery = await deliverQueuedCommunication(communication);
+        const updated = await getCaseByReference(caseRecord.caseId);
+
+        return {
+          success: true,
+          delivery,
+          providerMessageId: delivery.state === "sent" ? delivery.providerMessageId : undefined,
+          case: updated,
+        };
+      }),
+    escalateToBank: protectedProcedure
+      .input(z.object({ caseId: z.string().trim().min(4).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Demo mode is disabled in production." });
+        }
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!caseRecord.title.startsWith("[HACKATHON DEMO]")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This operation is only permitted on demo cases." });
+        }
+
+        // Set status to UNDER_REVIEW
+        await setCaseStatus({
+          caseId: caseRecord.caseId,
+          previousStatus: caseRecord.status,
+          nextStatus: "UNDER_REVIEW",
+          actorUserId: ctx.user.id,
+        });
+
+        const recipientEmail = Array.from(ENV.demoEmailRecipients)[0] || "demo-bank@local.invalid";
+        const subject = `[${caseRecord.caseId}] [HACKATHON DEMO] Urgent Nodal Bank Escalation: Non-Compliance Review`;
+        const body = [
+          "*** HACKATHON DEMONSTRATION NOTICE - CONTROLLED TEST ENVIRONMENT ***",
+          "",
+          `To: Nodal Bank Officer (${caseRecord.bankName || "Demo National Bank"})`,
+          `From: LienGuard Governance Desk`,
+          `Case Reference: ${caseRecord.caseId}`,
+          `Lien Amount: INR 1,50,000.00`,
+          "",
+          `Dear Nodal Officer,`,
+          "",
+          `The statutory response period for the cyber lien on account under case ${caseRecord.caseId} has elapsed without substantive authority clarification.`,
+          `Pursuant to RBI Master Directions on customer account operations, we formally request immediate internal portfolio review and verification of freezing order provenance.`,
+          "",
+          "This message was generated from the LienGuard audit workflow.",
+          "*** END HACKATHON DEMONSTRATION ***",
+        ].join("\n");
+
+        const communication = await createOutboundEmail({
+          caseRecordId: caseRecord.id,
+          recipientEmail,
+          subject,
+          body,
+          automated: true,
+          actorUserId: ctx.user.id,
+        });
+
+        await recordSystemCaseEvent({
+          caseRecordId: caseRecord.id,
+          type: "DEADLINE_FOLLOW_UP_QUEUED",
+          message: "Nodal bank escalation notice queued for portfolio compliance audit.",
+          actorLabel: "LienGuard Escalation Engine",
+        });
+
+        if (!communication) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to queue communication." });
+        }
+
+        const delivery = await deliverQueuedCommunication(communication);
+        const updated = await getCaseByReference(caseRecord.caseId);
+
+        return {
+          success: true,
+          delivery,
+          providerMessageId: delivery.state === "sent" ? delivery.providerMessageId : undefined,
+          case: updated,
+        };
+      }),
+    escalateToCybercrime: protectedProcedure
+      .input(z.object({ caseId: z.string().trim().min(4).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Demo mode is disabled in production." });
+        }
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!caseRecord.title.startsWith("[HACKATHON DEMO]")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This operation is only permitted on demo cases." });
+        }
+
+        // Set status to ESCALATED
+        await setCaseStatus({
+          caseId: caseRecord.caseId,
+          previousStatus: caseRecord.status,
+          nextStatus: "ESCALATED",
+          actorUserId: ctx.user.id,
+        });
+
+        const recipientEmail = Array.from(ENV.demoEmailRecipients)[0] || caseRecord.authorityEmail || "demo-authority@local.invalid";
+        const subject = `[${caseRecord.caseId}] [HACKATHON DEMO] Cybercrime Authority Escalation: Statutory Period Elapsed`;
+        const body = [
+          "*** HACKATHON DEMONSTRATION NOTICE - CONTROLLED TEST ENVIRONMENT ***",
+          "",
+          `To: Superintendent of Police / Cyber Crime Investigation Cell`,
+          `From: LienGuard Statutory Escalation Desk`,
+          `Case Reference: ${caseRecord.caseId}`,
+          `Lien Amount: INR 1,50,000.00`,
+          `Lien Reference: ${caseRecord.lienReference || "LIEN-DEMO-2026-9812"}`,
+          "",
+          `Dear Officer-in-Charge,`,
+          "",
+          `Formal escalation notice regarding Case ${caseRecord.caseId}. The initial 48-hour response window has expired without investigative response.`,
+          `The matter has been escalated to Tier-2 supervisory review. An official RTI draft is now prepared for administrative record tracking.`,
+          "",
+          "This message was generated from the LienGuard audit workflow.",
+          "*** END HACKATHON DEMONSTRATION ***",
+        ].join("\n");
+
+        const communication = await createOutboundEmail({
+          caseRecordId: caseRecord.id,
+          recipientEmail,
+          subject,
+          body,
+          automated: true,
+          actorUserId: ctx.user.id,
+        });
+
+        await recordSystemCaseEvent({
+          caseRecordId: caseRecord.id,
+          type: "DEADLINE_ESCALATED",
+          message: "Statutory grace period elapsed. Case escalated to Cyber Crime Cell supervisory authority.",
+          actorLabel: "LienGuard Escalation Engine",
+        });
+
+        if (!communication) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to queue communication." });
+        }
+
+        const delivery = await deliverQueuedCommunication(communication);
+        const updated = await getCaseByReference(caseRecord.caseId);
+
+        return {
+          success: true,
+          delivery,
+          providerMessageId: delivery.state === "sent" ? delivery.providerMessageId : undefined,
+          case: updated,
+        };
+      }),
+    generateRtiDraft: protectedProcedure
+      .input(z.object({ caseId: z.string().trim().min(4).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Demo mode is disabled in production." });
+        }
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        if (!caseRecord.title.startsWith("[HACKATHON DEMO]")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This operation is only permitted on demo cases." });
+        }
+        if (caseRecord.status !== "ESCALATED") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "RTI drafting is only permitted after a case has reached the ESCALATED status.",
+          });
+        }
+
+        const fileName = `${caseRecord.caseId}-rti-draft.txt`;
+        const content = [
+          "APPLICATION UNDER SECTION 6(1) OF THE RIGHT TO INFORMATION ACT, 2005",
+          "====================================================================",
+          "",
+          "To:",
+          "The Central Public Information Officer (CPIO) / Public Information Officer,",
+          "Office of the Superintendent of Police / Cyber Crime Investigation Cell.",
+          "",
+          `Subject: Request for Information regarding Bank Lien / Freezing Order on Case ${caseRecord.caseId}`,
+          "",
+          "1. PARTICULARS OF THE APPLICANT:",
+          `   Name: ${ctx.user.name || "Citizen Applicant"}`,
+          `   Email: ${ctx.user.email || "applicant@example.com"}`,
+          "",
+          "2. PARTICULARS OF THE INFORMATION SOUGHT:",
+          `   a) Copy of the formal police requisition / notice issued under Section 91 / 102 CrPC pertaining to Lien Reference: ${caseRecord.lienReference || "LIEN-DEMO-2026-9812"}.`,
+          `   b) Date of complaint registration, FIR/NCR number, and current investigative stage of the associated matter.`,
+          `   c) Reasons recorded in writing for freezing the lien amount of INR ${caseRecord.lienAmount || "1,50,000.00"} on account.`,
+          `   d) Name and designation of the Investigating Officer (IO) assigned to the case.`,
+          `   e) Expected timeline for submitting clearance report / NOC to the bank.`,
+          "",
+          "3. DECLARATION:",
+          "   The applicant is a citizen of India and the information sought is within the purview of the RTI Act, 2005.",
+          "",
+          "*** REVIEW-ONLY DRAFT — NOT SUBMITTED AUTOMATICALLY ***",
+        ].join("\n");
+
+        const uploaded = await storagePut(`lienguard/cases/${caseRecord.id}/rti/${fileName}`, content, "text/plain");
+        const doc = await createCaseDocument({
+          caseRecordId: caseRecord.id,
+          uploadedByUserId: ctx.user.id,
+          kind: "RTI_DRAFT",
+          fileName,
+          storageKey: uploaded.key,
+          contentType: "text/plain",
+          sizeBytes: Buffer.byteLength(content, "utf-8"),
+          eventType: "RTI_DRAFT_CREATED",
+          eventMessage: `RTI draft generated for escalated case ${caseRecord.caseId}. Saved for manual legal review.`,
+        });
+
+        const updated = await getCaseByReference(caseRecord.caseId);
+        return {
+          success: true,
+          content,
+          documentId: doc?.id,
+          case: updated,
+        };
+      }),
+    resetDemo: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ENV.isProduction && !ENV.localDemoMode) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Demo mode is disabled in production." });
+      }
+      const count = await purgeDemoCases();
+      return { success: true, count };
+    }),
+    simulateInboundReply: protectedProcedure
+      .input(z.object({
+        caseId: z.string().trim().min(4).max(32),
+        body: z.string().trim().min(5).max(8000).optional(),
+        senderEmail: z.string().trim().email().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Demo actions are disabled in production." });
+        }
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        requireCaseAccess(ctx.user, caseRecord);
+
+        const senderEmail = input.senderEmail || caseRecord.authorityEmail || "authority-demo@local.invalid";
+        const providerMessageId = `demo-inbound-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const body = input.body || `[LOCAL DEMO] Inbound authority response regarding case ${caseRecord.caseId}. The matter is under official review.`;
+
+        const subject = `RE: [${caseRecord.caseId}] Authority Response`;
+        const result = await recordInboundEmail({
+          caseRecordId: caseRecord.id,
+          providerMessageId,
+          senderEmail,
+          subject,
+          body,
+        });
+
+        const analysis = analyzeInboundReply({
+          subject,
+          body,
+          senderEmail,
+          caseId: caseRecord.caseId,
+        });
+
+        if (!result.duplicate) {
+          await createUserNotification({
+            userId: caseRecord.userId,
+            title: analysis.intent === "REQUESTING_DOCUMENTS"
+              ? `Action Required: Documents requested for ${caseRecord.caseId}`
+              : `New reply received for case ${caseRecord.caseId}`,
+            message: `${senderEmail}: ${analysis.summary}`,
+          });
+        }
+
+        return {
+          success: true,
+          caseId: caseRecord.caseId,
+          duplicate: result.duplicate,
+          communication: result.communication,
+          analysis,
+        };
+      }),
+    simulateDeadlineOverdue: protectedProcedure
+      .input(z.object({
+        caseId: z.string().trim().min(4).max(32),
+        hoursOverdue: z.number().min(1).max(720).default(72),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ENV.isProduction && !ENV.localDemoMode) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Demo actions are disabled in production." });
+        }
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        requireCaseAccess(ctx.user, caseRecord);
+
+        const pastDeadline = new Date(Date.now() - input.hoursOverdue * 60 * 60 * 1000);
+        await updateCaseDetails({
+          caseId: caseRecord.caseId,
+          actorUserId: ctx.user.id,
+          responseDeadline: pastDeadline,
+        });
+
+        if (caseRecord.status === "OPEN" || caseRecord.status === "UNDER_REVIEW") {
+          await setCaseStatus({
+            caseId: caseRecord.caseId,
+            previousStatus: caseRecord.status,
+            nextStatus: "AWAITING_RESPONSE",
+            actorUserId: ctx.user.id,
+          });
+        }
+
+        const summary = await runDeadlineAutomation();
+        const updated = await getCaseByReference(caseRecord.caseId);
+
+        return { success: true, summary, case: updated };
       }),
   }),
 });

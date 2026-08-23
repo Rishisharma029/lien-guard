@@ -1,25 +1,46 @@
+import "dotenv/config";
 import mysql from "mysql2/promise";
 
-const required = ["DATABASE_URL", "LOCAL_DEMO_MODE"];
-for (const name of required) {
-  if (!process.env[name]) {
-    throw new Error(`${name} is required to seed the local demonstration database.`);
-  }
+if (process.env.NODE_ENV === "production") {
+  throw new Error("Local demonstration seeding is not permitted in production.");
 }
 
-if (process.env.LOCAL_DEMO_MODE.toLowerCase() !== "true" || process.env.NODE_ENV === "production") {
-  throw new Error("Local demonstration seeding is permitted only with LOCAL_DEMO_MODE=true outside production.");
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required in .env to seed the database.");
 }
 
 const pool = await mysql.createPool(process.env.DATABASE_URL);
 
-const demoUser = {
-  openId: "local-demo-admin",
-  name: "LienGuard Demo Administrator",
-  email: "demo.user@local.invalid",
-  loginMethod: "local-demo",
-  role: "admin",
-};
+const demoUsers = [
+  {
+    openId: "demo-citizen",
+    name: "Demo Citizen",
+    email: "citizen@lienguard.dev",
+    loginMethod: "demo_auth",
+    role: "citizen",
+  },
+  {
+    openId: "demo-bank",
+    name: "Nodal Bank Officer",
+    email: "bank@lienguard.dev",
+    loginMethod: "demo_auth",
+    role: "bank",
+  },
+  {
+    openId: "demo-authority",
+    name: "Designated Police Authority",
+    email: "authority@lienguard.dev",
+    loginMethod: "demo_auth",
+    role: "authority",
+  },
+  {
+    openId: "demo-admin",
+    name: "LienGuard System Administrator",
+    email: "admin@lienguard.dev",
+    loginMethod: "demo_auth",
+    role: "admin",
+  },
+];
 
 const demoCases = [
   {
@@ -70,17 +91,19 @@ const demoCases = [
 ];
 
 try {
-  await pool.execute(
-    `INSERT INTO users (openId, name, email, loginMethod, role, lastSignedIn)
-     VALUES (?, ?, ?, ?, ?, NOW())
-     ON DUPLICATE KEY UPDATE
-       name = VALUES(name), email = VALUES(email), loginMethod = VALUES(loginMethod),
-       role = VALUES(role), lastSignedIn = NOW()`,
-    [demoUser.openId, demoUser.name, demoUser.email, demoUser.loginMethod, demoUser.role],
-  );
+  for (const demoUser of demoUsers) {
+    await pool.execute(
+      `INSERT INTO users (openId, name, email, loginMethod, role, lastSignedIn)
+       VALUES (?, ?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         name = VALUES(name), email = VALUES(email), loginMethod = VALUES(loginMethod),
+         role = VALUES(role), lastSignedIn = NOW()`,
+      [demoUser.openId, demoUser.name, demoUser.email, demoUser.loginMethod, demoUser.role],
+    );
+  }
 
-  const [[user]] = await pool.query("SELECT id FROM users WHERE openId = ? LIMIT 1", [demoUser.openId]);
-  if (!user?.id) throw new Error("The local demonstration user could not be created.");
+  const [[user]] = await pool.query("SELECT id FROM users WHERE openId = ? LIMIT 1", ["demo-citizen"]);
+  if (!user?.id) throw new Error("The local demonstration citizen user could not be created.");
 
   for (const record of demoCases) {
     await pool.query(

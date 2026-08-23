@@ -58,6 +58,7 @@ export const ENV = {
   mailerooFromEmail: optional("MAILEROO_FROM_EMAIL"),
   mailerooReplyTo: optional("MAILEROO_REPLY_TO"),
   mailerooInboundDomain: optional("MAILEROO_INBOUND_DOMAIN").toLowerCase(),
+  mailerooApiKey: optional("MAILEROO_API_KEY"),
   automationSecret: optional("AUTOMATION_SECRET"),
   deadlineEscalationGraceHours: Math.min(30 * 24, Math.max(1, Number.parseInt(optional("DEADLINE_ESCALATION_GRACE_HOURS") || "48", 10) || 48)),
   emailDeliveryMode: parseEmailDeliveryMode(optional("EMAIL_DELIVERY_MODE").toLowerCase()),
@@ -71,11 +72,7 @@ const emailDeliveryGuard = createEmailDeliveryGuard(
 
 export function isMailerooConfigured() {
   return Boolean(
-    ENV.mailerooSmtpHost &&
-      Number.isInteger(ENV.mailerooSmtpPort) &&
-      ENV.mailerooSmtpPort > 0 &&
-      ENV.mailerooSmtpUser &&
-      ENV.mailerooSmtpPassword &&
+    (ENV.mailerooApiKey || (ENV.mailerooSmtpUser && ENV.mailerooSmtpPassword)) &&
       ENV.mailerooFromEmail,
   );
 }

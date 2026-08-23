@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 const required = [
   "DATABASE_URL",
   "MAILEROO_SMTP_USER",

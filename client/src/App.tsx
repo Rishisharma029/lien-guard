@@ -19,6 +19,7 @@ const StaticPreview = lazy(() => import("@/pages/StaticPreview"));
 const Workspace = lazy(() => import("@/pages/Workspace"));
 const RtiAssistant = lazy(() => import("@/pages/RtiAssistant"));
 const Timeline = lazy(() => import("@/pages/Timeline"));
+const HackathonDemo = lazy(() => import("@/pages/HackathonDemo"));
 
 function PageLoading() {
   return <main className="grid min-h-screen place-items-center bg-background text-sm font-medium text-muted-foreground">Loading secure workspace…</main>;
@@ -47,6 +48,7 @@ function CommunicationsRoute() { return <DashboardLayout><Communications /></Das
 function DocumentsRoute() { return <DashboardLayout><Documents /></DashboardLayout>; }
 function EscalationsRoute() { return <DashboardLayout><Escalations /></DashboardLayout>; }
 function RtiRoute() { return <DashboardLayout><RtiAssistant /></DashboardLayout>; }
+function DemoRoute() { return <DashboardLayout><HackathonDemo /></DashboardLayout>; }
 
 function Router() {
   return (
@@ -55,6 +57,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/preview" component={StaticPreview} />
         <Route path="/workspace" component={WorkspaceRoute} />
+        <Route path="/demo" component={DemoRoute} />
         <Route path="/cases" component={CasesRoute} />
         <Route path="/cases/:caseId" component={CaseDetailRoute} />
         <Route path="/timeline" component={TimelineRoute} />

@@ -4,15 +4,17 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
-    "check": "tsc --noEmit",
-    "format": "prettier --write .",
-    "test": "vitest run",
+    "dev": "node ./node_modules/tsx/dist/cli.mjs watch server/_core/index.ts",
+    "build": "node ./node_modules/vite/bin/vite.js build && node ./node_modules/esbuild/bin/esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "node dist/index.js",
+    "check": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "format": "node ./node_modules/prettier/bin/prettier.cjs --write .",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
     "demo:check": "node scripts/verify-demo-config.mjs",
-    "demo:local": "bash scripts/run-local-demo.sh",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "demo:seed": "node scripts/seed-local-demo.mjs",
+    "db:migrate": "node ./node_modules/drizzle-kit/bin.cjs migrate",
+    "db:reconcile": "node scripts/reconcile-drizzle-migrations.mjs",
+    "db:push": "node ./node_modules/drizzle-kit/bin.cjs generate && node ./node_modules/drizzle-kit/bin.cjs migrate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1116.0",

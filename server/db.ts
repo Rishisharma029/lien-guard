@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq, like, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { randomUUID } from "node:crypto";
 import {
@@ -47,34 +47,31 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     return;
   }
 
-  const values: InsertUser = { openId: user.openId };
-  const updateSet: Record<string, unknown> = {};
-  const textFields = ["name", "email", "loginMethod"] as const;
+  const existing = await getUserByOpenId(user.openId);
+  const now = user.lastSignedIn || new Date();
+  const role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "citizen");
 
-  textFields.forEach(field => {
-    if (user[field] !== undefined) {
-      const value = user[field] ?? null;
-      values[field] = value;
-      updateSet[field] = value;
-    }
-  });
-
-  if (user.lastSignedIn !== undefined) {
-    values.lastSignedIn = user.lastSignedIn;
-    updateSet.lastSignedIn = user.lastSignedIn;
+  if (existing) {
+    await db
+      .update(users)
+      .set({
+        name: user.name !== undefined ? user.name : existing.name,
+        email: user.email !== undefined ? user.email : existing.email,
+        loginMethod: user.loginMethod !== undefined ? user.loginMethod : existing.loginMethod,
+        role: user.role !== undefined ? user.role : existing.role,
+        lastSignedIn: now,
+      })
+      .where(eq(users.id, existing.id));
+  } else {
+    await db.insert(users).values({
+      openId: user.openId,
+      name: user.name || null,
+      email: user.email || null,
+      loginMethod: user.loginMethod || null,
+      role,
+      lastSignedIn: now,
+    });
   }
-  if (user.role !== undefined) {
-    values.role = user.role;
-    updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
-
-  if (!values.lastSignedIn) values.lastSignedIn = new Date();
-  if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -188,6 +185,21 @@ export async function markNotificationRead(notificationId: number, userId: numbe
   return true;
 }
 
+export async function createUserNotification(input: {
+  userId: number;
+  title: string;
+  message: string;
+}) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.insert(userNotifications).values({
+    userId: input.userId,
+    type: "role_changed",
+    title: input.title.slice(0, 160),
+    message: input.message,
+  });
+}
+
 export async function getRoleChangeAudits() {
   const db = await getDb();
   if (!db) return [];
@@ -229,6 +241,14 @@ export async function getCaseByReference(caseId: string) {
   return result[0];
 }
 
+export async function getCaseById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(cases).where(eq(cases.id, id)).limit(1);
+  return result[0];
+}
+
 export async function createCase(input: {
   userId: number;
   title: string;
@@ -241,7 +261,9 @@ export async function createCase(input: {
   lienReference?: string;
   transactionReference?: string;
   authorityName?: string;
+  authorityEmail?: string;
   responseDeadline?: Date;
+  initialStatus?: CaseStatus;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
@@ -250,7 +272,8 @@ export async function createCase(input: {
     const caseId = createCaseReference();
     try {
       await db.transaction(async tx => {
-        const insertResult = await tx.insert(cases).values({ ...input, caseId, status: "OPEN" });
+        const { initialStatus, ...insertFields } = input;
+        const insertResult = await tx.insert(cases).values({ ...insertFields, caseId, status: initialStatus || "OPEN" });
         const caseRecordId = Number(insertResult[0].insertId);
         await tx.insert(caseEvents).values({
           caseId: caseRecordId,
@@ -413,6 +436,13 @@ export async function getCaseCommunicationById(communicationId: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(caseCommunications).where(eq(caseCommunications.id, communicationId)).limit(1);
+  return result[0];
+}
+
+export async function getCaseCommunicationByProviderMessageId(providerMessageId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(caseCommunications).where(eq(caseCommunications.providerMessageId, providerMessageId)).limit(1);
   return result[0];
 }
 
@@ -673,3 +703,43 @@ export async function createCaseDocument(input: {
   const documents = await listCaseDocuments(input.caseRecordId);
   return documents.find(document => document.storageKey === input.storageKey);
 }
+
+export async function getLatestDemoCase(userId?: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(cases)
+    .where(like(cases.title, "[HACKATHON DEMO]%"))
+    .orderBy(desc(cases.createdAt))
+    .limit(1);
+
+  return result[0];
+}
+
+export async function purgeDemoCases() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const demoCases = await db
+    .select({ id: cases.id })
+    .from(cases)
+    .where(like(cases.title, "[HACKATHON DEMO]%"));
+
+  if (demoCases.length === 0) return 0;
+
+  const ids = demoCases.map(c => c.id);
+  await db.transaction(async tx => {
+    for (const id of ids) {
+      await tx.delete(caseAutomationActions).where(eq(caseAutomationActions.caseId, id));
+      await tx.delete(caseEvents).where(eq(caseEvents.caseId, id));
+      await tx.delete(caseCommunications).where(eq(caseCommunications.caseId, id));
+      await tx.delete(caseDocuments).where(eq(caseDocuments.caseId, id));
+      await tx.delete(cases).where(eq(cases.id, id));
+    }
+  });
+
+  return ids.length;
+}
+

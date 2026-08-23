@@ -4,6 +4,7 @@ import { ENV, isMailerooConfigured } from "./_core/env";
 
 const CONTROL_CHARACTER = /[\r\n\u0000]/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAILEROO_API_SEND_URL = "https://smtp.maileroo.com/send";
 
 export type CaseEmailMessage = {
   to: string;
@@ -15,6 +16,7 @@ export type CaseEmailMessage = {
 
 export type CaseEmailDelivery = {
   providerMessageId: string;
+  transport?: "api" | "smtp";
 };
 
 export function isValidEmailAddress(value: string) {
@@ -33,9 +35,71 @@ function htmlEscape(value: string) {
   return value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
 }
 
-function buildTransport() {
-  if (!isMailerooConfigured()) {
-    throw new Error("Maileroo is not configured. Set the SMTP user, password, and verified sender address before attempting delivery.");
+/** Sends an operational email via Maileroo REST API (HTTP POST). */
+export async function deliverCaseEmailViaApi(message: CaseEmailMessage): Promise<CaseEmailDelivery> {
+  if (!ENV.mailerooApiKey) {
+    throw new Error("MAILEROO_API_KEY is not configured.");
+  }
+
+  const to = safeHeader(message.to, "Recipient", 320);
+  if (!isValidEmailAddress(to)) throw new Error("Recipient must be a valid email address.");
+
+  const subject = safeHeader(message.subject, "Subject", 180);
+  const text = message.text.trim();
+  if (!text || text.length > 8_000 || CONTROL_CHARACTER.test(text.replace(/\r?\n/g, ""))) {
+    throw new Error("Email content is invalid.");
+  }
+
+  const from = safeHeader(ENV.mailerooFromEmail, "Sender", 320);
+  if (!isValidEmailAddress(from)) throw new Error("MAILEROO_FROM_EMAIL must be a verified email address.");
+
+  const replyTo = message.replyTo || ENV.mailerooReplyTo || undefined;
+  if (replyTo && !isValidEmailAddress(replyTo)) throw new Error("Reply-to must be a valid email address.");
+
+  const params = new URLSearchParams();
+  params.append("from", `LienGuard Statutory Notices <${from}>`);
+  params.append("to", to);
+  params.append("subject", subject);
+  params.append("plain", text);
+  params.append("html", `<pre style="font-family:Arial,sans-serif;white-space:pre-wrap">${htmlEscape(text)}</pre>`);
+  if (replyTo) params.append("reply_to", replyTo);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+
+  try {
+    const response = await fetch(MAILEROO_API_SEND_URL, {
+      method: "POST",
+      headers: {
+        "X-API-Key": ENV.mailerooApiKey,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-LienGuard-Idempotency-Key": safeHeader(message.idempotencyKey, "Idempotency key", 160),
+      },
+      body: params.toString(),
+      signal: controller.signal,
+    });
+
+    const result = await response.json().catch(() => null) as {
+      success?: boolean;
+      message?: string;
+      data?: { reference_id?: string; message_id?: string; id?: string };
+    } | null;
+
+    if (!response.ok || !result?.success) {
+      const errorMsg = result?.message || `Maileroo API returned HTTP status ${response.status}`;
+      throw new Error(errorMsg);
+    }
+
+    const providerMessageId = result.data?.reference_id || result.data?.message_id || result.data?.id || `mlr-api-${Date.now()}`;
+    return { providerMessageId, transport: "api" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildSmtpTransport() {
+  if (!ENV.mailerooSmtpUser || !ENV.mailerooSmtpPassword) {
+    throw new Error("Maileroo SMTP credentials are not configured.");
   }
 
   const secure = ENV.mailerooSmtpPort === 465;
@@ -53,8 +117,8 @@ function buildTransport() {
   return nodemailer.createTransport(options);
 }
 
-/** Sends a plain-text operational message through the configured Maileroo SMTP account. */
-export async function deliverCaseEmail(message: CaseEmailMessage): Promise<CaseEmailDelivery> {
+/** Sends an operational email via Maileroo SMTP over TLS. */
+export async function deliverCaseEmailViaSmtp(message: CaseEmailMessage): Promise<CaseEmailDelivery> {
   const to = safeHeader(message.to, "Recipient", 320);
   if (!isValidEmailAddress(to)) throw new Error("Recipient must be a valid email address.");
 
@@ -70,8 +134,8 @@ export async function deliverCaseEmail(message: CaseEmailMessage): Promise<CaseE
   const replyTo = message.replyTo || ENV.mailerooReplyTo || undefined;
   if (replyTo && !isValidEmailAddress(replyTo)) throw new Error("Reply-to must be a valid email address.");
 
-  const result = await buildTransport().sendMail({
-    from,
+  const result = await buildSmtpTransport().sendMail({
+    from: `LienGuard Statutory Notices <${from}>`,
     to,
     subject,
     text,
@@ -85,5 +149,32 @@ export async function deliverCaseEmail(message: CaseEmailMessage): Promise<CaseE
 
   const providerMessageId = result.messageId?.trim();
   if (!providerMessageId) throw new Error("Maileroo did not return a message identifier.");
-  return { providerMessageId };
+  return { providerMessageId, transport: "smtp" };
+}
+
+/**
+ * Sends a case email using the primary Maileroo REST API,
+ * with automatic fallback to Maileroo SMTP over TLS.
+ */
+export async function deliverCaseEmail(message: CaseEmailMessage): Promise<CaseEmailDelivery> {
+  if (!isMailerooConfigured()) {
+    throw new Error("Maileroo is not configured. Set MAILEROO_API_KEY or SMTP credentials in .env.");
+  }
+
+  // 1. Try Maileroo REST API if API key is present
+  if (ENV.mailerooApiKey) {
+    try {
+      return await deliverCaseEmailViaApi(message);
+    } catch (apiError) {
+      console.warn("[Maileroo] REST API delivery error, attempting SMTP fallback:", apiError instanceof Error ? apiError.message : apiError);
+      // Fall through to SMTP if SMTP is configured
+      if (ENV.mailerooSmtpUser && ENV.mailerooSmtpPassword) {
+        return await deliverCaseEmailViaSmtp(message);
+      }
+      throw apiError;
+    }
+  }
+
+  // 2. Otherwise use SMTP
+  return await deliverCaseEmailViaSmtp(message);
 }

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { ArrowRight, ArrowUpRight, BadgeCheck, Building2, FileCheck2, Landmark, Scale, ShieldCheck, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 
@@ -18,15 +19,25 @@ export default function Home() {
   const [, navigate] = useLocation();
   const demoLogin = trpc.auth.demoLogin.useMutation({
     onSuccess: () => { window.location.assign("/workspace"); },
+    onError: (error) => {
+      toast.error(error.message || "Failed to connect to local database. Please ensure MySQL is running on port 3306.");
+    },
   });
 
-  const openWorkspace = (role: "citizen" | "bank" | "authority" | "admin" = "citizen") => {
+  const openWorkspace = (role: "citizen" | "bank" | "authority" | "admin" = "citizen", redirectTo = "/workspace") => {
     const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
     if (oauthPortalUrl && !oauthPortalUrl.includes("example.com")) {
       startLogin();
       return;
     }
-    demoLogin.mutate({ role });
+    demoLogin.mutate(
+      { role },
+      {
+        onSuccess: () => {
+          window.location.assign(redirectTo);
+        },
+      }
+    );
   };
 
   useEffect(() => { if (isAuthenticated) navigate("/workspace"); }, [isAuthenticated, navigate]);
@@ -42,7 +53,9 @@ export default function Home() {
           <span><span className="block text-lg font-extrabold tracking-tight">LienGuard</span><span className="eyebrow mt-0.5 block text-[0.51rem] text-[#aab7cc]">Case intelligence</span></span>
         </button>
         <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-[#aab7cc] sm:block">Secure by role. Clear by record.</span>
+          <Button disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("citizen", "/demo")} variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200">
+            ⚡ Hackathon Demo
+          </Button>
           <Button disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("admin")} variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
             {demoLogin.isPending ? "Connecting…" : "Enter workspace"}
           </Button>
@@ -54,13 +67,12 @@ export default function Home() {
           <h1 className="font-display mt-7 text-5xl leading-[0.96] tracking-tight sm:text-6xl lg:text-[5.7rem]">A case should never <span className="text-[#bcff6b]">disappear</span> into the process.</h1>
           <p className="mt-8 max-w-xl text-lg leading-8 text-[#c4cedd]">LienGuard makes the status, responsibility, and access behind every case legible—from the first request to the final resolution.</p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
-            <Button size="lg" disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("citizen")} className="h-14 rounded-xl bg-[#bcff6b] px-6 font-semibold text-[#11200d] hover:bg-[#d2ff9d]">
-              {demoLogin.isPending ? "Opening workspace…" : "Enter secure workspace"} <ArrowRight className="ml-2 h-4 w-4" />
+            <Button size="lg" disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("citizen", "/demo")} className="h-14 rounded-xl bg-amber-500 px-6 font-bold text-slate-950 hover:bg-amber-400">
+              ⚡ Launch Hackathon Demo Mode <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-2 text-sm text-[#aab7cc]">
-              <BadgeCheck className="h-4 w-4 text-[#bcff6b]" />
-              Role-protected enterprise workspace
-            </div>
+            <Button size="lg" disabled={loading || demoLogin.isPending} onClick={() => openWorkspace("citizen")} variant="outline" className="h-14 rounded-xl border-white/20 bg-white/5 px-6 font-semibold text-white hover:bg-white/10">
+              Open Workspace
+            </Button>
           </div>
         </div>
         <div className="relative mx-auto w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/15 bg-[#122138] p-4 shadow-[0_40px_100px_rgba(0,0,0,0.35)]">

@@ -103,10 +103,18 @@ Thumbs.db
 
 # Webdev / Manus System Artifacts
 .webdev/
+.manus-logs/
+.gemini/
 client/public/__manus__/version.json
 .project-config.json
+
+# Local Uploads and Data
+uploads/
+**/uploads/
 
 # Temporary and Scratch Dirs
 tmp/
 temp/
 scratch/
+migration-error.txt
+*.tmp
