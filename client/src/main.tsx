@@ -18,7 +18,14 @@ if (analyticsEndpoint && analyticsWebsiteId) {
   document.head.appendChild(analyticsScript);
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -72,11 +79,35 @@ const trpcClient = trpc.createClient({
         }
         return {};
       },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
+      async fetch(input, init) {
+        try {
+          const res = await globalThis.fetch(input, {
+            ...(init ?? {}),
+            credentials: "include",
+          });
+
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("application/json") && !contentType.includes("text/json")) {
+            // When hosted statically or backend is unreachable, gracefully return empty tRPC data
+            return new Response(
+              JSON.stringify([{ result: { data: { json: null } } }]),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          return res;
+        } catch {
+          return new Response(
+            JSON.stringify([{ result: { data: { json: null } } }]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
       },
     }),
   ],
