@@ -13,7 +13,7 @@ export function StickyMobileCTA({ onRegister }: { onRegister?: () => void }) {
     <div className="fixed bottom-0 inset-x-0 z-40 bg-[#0b1627]/95 backdrop-blur-md border-t border-white/10 p-3 sm:hidden shadow-2xl safe-area-pb">
       <div className="flex items-center gap-2">
         <Button
-          onClick={onRegister ? onRegister : () => navigate("/workspace")}
+          onClick={onRegister ? onRegister : () => navigate("/cases")}
           className="flex-1 bg-[#bcff6b] hover:bg-[#aef558] text-[#0b1627] font-bold text-xs h-10 rounded-lg shadow"
         >
           <FolderPlus className="h-4 w-4 mr-1.5" />

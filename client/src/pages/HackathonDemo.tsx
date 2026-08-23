@@ -37,7 +37,8 @@ export default function HackathonDemo() {
   const [activeRtiContent, setActiveRtiContent] = useState<string | null>(null);
 
   const { data: demoState, isLoading, refetch } = trpc.demo.getState.useQuery(undefined, {
-    refetchInterval: 3000,
+    refetchInterval: (query) => (query.state.data ? 3000 : false),
+    retry: false,
   });
 
   const registerMutation = trpc.demo.registerDemoCase.useMutation({

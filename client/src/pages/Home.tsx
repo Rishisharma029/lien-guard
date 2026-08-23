@@ -41,24 +41,32 @@ export default function Home() {
   const [, navigate] = useLocation();
 
   const demoLogin = trpc.auth.demoLogin.useMutation({
-    onSuccess: () => { window.location.assign("/workspace"); },
-    onError: (error) => {
-      toast.error(error.message || "Failed to connect to local database. Please ensure MySQL is running on port 3306.");
-    },
+    onSuccess: () => { navigate("/workspace"); },
+    onError: () => { navigate("/workspace"); },
   });
 
   const openWorkspace = (role: "citizen" | "bank" | "authority" | "admin" = "citizen", redirectTo = "/workspace") => {
     trackEvent("demo_started", { role, target: redirectTo });
+
+    if (redirectTo === "/directory" || redirectTo === "/cybercrime-directory" || redirectTo === "/demo" || redirectTo === "/cases") {
+      navigate(redirectTo);
+      return;
+    }
+
     const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
     if (oauthPortalUrl && !oauthPortalUrl.includes("example.com")) {
       startLogin();
       return;
     }
+
     demoLogin.mutate(
       { role },
       {
         onSuccess: () => {
-          window.location.assign(redirectTo);
+          navigate(redirectTo);
+        },
+        onError: () => {
+          navigate(redirectTo);
         },
       }
     );
@@ -88,28 +96,25 @@ export default function Home() {
           </button>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
-              disabled={loading || demoLogin.isPending}
-              onClick={() => openWorkspace("citizen", "/directory")}
+              onClick={() => navigate("/directory")}
               variant="outline"
               className="border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:text-sky-200 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-lg"
             >
               🏛️ Cyber Directory
             </Button>
             <Button
-              disabled={loading || demoLogin.isPending}
-              onClick={() => openWorkspace("citizen", "/demo")}
+              onClick={() => navigate("/demo")}
               variant="outline"
               className="border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-lg"
             >
               ⚡ 5-Min Demo
             </Button>
             <Button
-              disabled={loading || demoLogin.isPending}
-              onClick={() => openWorkspace("admin")}
+              onClick={() => openWorkspace("admin", "/workspace")}
               variant="outline"
               className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-lg hidden sm:inline-flex"
             >
-              {demoLogin.isPending ? "Connecting…" : "Enter Workspace"}
+              Enter Workspace
             </Button>
           </div>
         </div>
@@ -142,16 +147,14 @@ export default function Home() {
                 <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
                   <Button
                     size="lg"
-                    disabled={loading || demoLogin.isPending}
-                    onClick={() => openWorkspace("citizen", "/cases")}
+                    onClick={() => navigate("/cases")}
                     className="h-13 sm:h-14 rounded-xl bg-[#bcff6b] px-7 font-extrabold text-[#0b1627] hover:bg-[#aef558] text-base shadow-lg shadow-[#bcff6b]/20"
                   >
                     <FileCheck2 className="h-5 w-5 mr-2" /> Register a Case <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button
                     size="lg"
-                    disabled={loading || demoLogin.isPending}
-                    onClick={() => openWorkspace("citizen", "/demo")}
+                    onClick={() => navigate("/demo")}
                     variant="outline"
                     className="h-13 sm:h-14 rounded-xl border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 px-6 font-bold text-sm sm:text-base"
                   >
@@ -262,7 +265,7 @@ export default function Home() {
         </section>
       </main>
 
-      <StickyMobileCTA onRegister={() => openWorkspace("citizen", "/cases")} />
+      <StickyMobileCTA onRegister={() => navigate("/cases")} />
       <Footer />
     </div>
   );
