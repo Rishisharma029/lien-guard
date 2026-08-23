@@ -3,6 +3,8 @@ import type { Express, Request, Response } from "express";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
 import { runDeadlineAutomation } from "./automation";
+import { scheduledRateLimiter } from "./rateLimit";
+import { logSecurityEvent } from "./securityLog";
 
 function safelyMatchesAutomationSecret(req: Request) {
   if (!ENV.automationSecret) return false;
@@ -25,6 +27,13 @@ async function isAuthenticatedScheduledCallback(req: Request) {
 
 async function processDeadlineAutomation(req: Request, res: Response) {
   if (!(await isAuthenticatedScheduledCallback(req))) {
+    logSecurityEvent({
+      type: "UNAUTHORIZED_ACCESS_ATTEMPT",
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+      details: { path: req.path, reason: "Scheduled callback authorization failed" },
+      result: "BLOCKED",
+    });
     res.status(401).json({ error: "Scheduled callback authentication failed." });
     return;
   }
@@ -40,5 +49,9 @@ async function processDeadlineAutomation(req: Request, res: Response) {
 }
 
 export function registerScheduledRoutes(app: Express) {
-  app.post("/api/scheduled/deadline-automation", processDeadlineAutomation);
+  app.post(
+    "/api/scheduled/deadline-automation",
+    scheduledRateLimiter.middleware(),
+    processDeadlineAutomation
+  );
 }

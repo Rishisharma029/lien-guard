@@ -12,6 +12,8 @@ import {
 } from "./db";
 import { isValidEmailAddress } from "./maileroo";
 import { analyzeInboundReply } from "./replyIntelligence";
+import { logSecurityEvent } from "./securityLog";
+import { webhookRateLimiter } from "./rateLimit";
 
 const caseReferencePattern = /\b(LG-\d{4}-[A-F0-9]{12})\b/i;
 const validationHost = "inbound-api.maileroo.net";
@@ -98,6 +100,19 @@ export async function handleMailerooInbound(req: Request, res: Response) {
 
   // Security Verification: SPF, DKIM, DMARC, Spam check
   if (payload.is_spam || !payload.dkim_result || !payload.is_dmarc_aligned || !payload.spf_result) {
+    logSecurityEvent({
+      type: "WEBHOOK_VALIDATION_FAILED",
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+      details: {
+        sender: payload.envelope_sender,
+        spf: payload.spf_result,
+        dkim: payload.dkim_result,
+        dmarc: payload.is_dmarc_aligned,
+        isSpam: payload.is_spam,
+      },
+      result: "BLOCKED",
+    });
     res.status(202).json({
       accepted: false,
       reason: "Message did not meet inbound security policy (SPF/DKIM/DMARC failure or flagged as spam).",
@@ -135,6 +150,17 @@ export async function handleMailerooInbound(req: Request, res: Response) {
       Array.from(ENV.demoEmailRecipients).includes(payload.envelope_sender.toLowerCase()));
 
   if (!isAuthorized) {
+    logSecurityEvent({
+      type: "INVALID_AUTHORITY_ACCESS",
+      caseId: caseRecord.caseId,
+      ip: req.ip,
+      details: {
+        sender: payload.envelope_sender,
+        expected: caseRecord.authorityEmail,
+        reason: "Sender email mismatch with assigned authority",
+      },
+      result: "BLOCKED",
+    });
     res.status(202).json({ accepted: false, reason: "Inbound sender is not the recorded authority for this case." });
     return;
   }
@@ -257,10 +283,25 @@ async function handleMailerooEvents(req: Request, res: Response) {
 
 export function registerMailerooWebhook(app: Express) {
   // 1. Inbound email routing webhook (for incoming authority replies)
-  app.post("/api/webhooks/maileroo/inbound", express.json({ limit: "256kb", strict: true }), handleMailerooInbound);
+  app.post(
+    "/api/webhooks/maileroo/inbound",
+    webhookRateLimiter.middleware(),
+    express.json({ limit: "256kb", strict: true }),
+    handleMailerooInbound
+  );
 
   // 2. Real-time delivery & engagement events callback (for delivery, open, click, bounce events)
-  app.post("/api/webhooks/maileroo/events", express.json({ limit: "256kb", strict: true }), handleMailerooEvents);
-  app.post("/api/webhooks/maileroo/delivery", express.json({ limit: "256kb", strict: true }), handleMailerooEvents);
+  app.post(
+    "/api/webhooks/maileroo/events",
+    webhookRateLimiter.middleware(),
+    express.json({ limit: "256kb", strict: true }),
+    handleMailerooEvents
+  );
+  app.post(
+    "/api/webhooks/maileroo/delivery",
+    webhookRateLimiter.middleware(),
+    express.json({ limit: "256kb", strict: true }),
+    handleMailerooEvents
+  );
 }
 

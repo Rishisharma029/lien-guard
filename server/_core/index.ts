@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -10,6 +10,9 @@ import { registerScheduledRoutes } from "../scheduled";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
+import { ENV, isOriginAllowed } from "./env";
+import { logSecurityEvent } from "../securityLog";
+import { apiRateLimiter } from "../rateLimit";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -34,46 +37,155 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Honor exactly one trusted reverse proxy so req.secure cannot be spoofed by
-  // direct clients while deployed HTTPS requests retain their original scheme.
+  // 1. Proxy Trust: Honor exactly one trusted reverse proxy
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
-  app.use((_req, res, next) => {
+
+  // 2. Comprehensive Security Headers
+  app.use((req: Request, res: Response, next: NextFunction) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-    if (process.env.NODE_ENV === "production") {
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
+
+    // HSTS: Only apply in production when running over HTTPS
+    const isHttps = req.secure || req.protocol === "https" || req.get("x-forwarded-proto") === "https";
+    if (ENV.isProduction && isHttps) {
       res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     }
+
     next();
   });
-  // Simple health check endpoint for monitoring, load balancers, and container orchestration
-  app.get("/health", (_req, res) => {
-    res.status(200).json({ status: "ok" });
+
+  // 3. Strict CORS Middleware
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = req.get("origin");
+
+    if (origin) {
+      if (isOriginAllowed(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-csrf-token, x-trpc-source");
+        res.setHeader("Vary", "Origin");
+      } else {
+        logSecurityEvent({
+          type: "UNAUTHORIZED_ACCESS_ATTEMPT",
+          ip: req.ip,
+          userAgent: req.get("user-agent"),
+          details: { origin, path: req.path, method: req.method, reason: "CORS origin rejected" },
+          result: "BLOCKED",
+        });
+        res.status(403).json({ error: "CORS policy violation: Origin not allowed." });
+        return;
+      }
+    }
+
+    // Handle preflight OPTIONS
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+
+    next();
   });
 
-  // Maileroo webhooks register their own 256 KB JSON parser before this broader
-  // document-upload parser so inbound mail events cannot consume upload-sized bodies.
+  // 4. CSRF Defense-in-Depth for State-Changing Requests
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const stateChanging = req.method === "POST" || req.method === "PUT" || req.method === "PATCH" || req.method === "DELETE";
+    
+    // Exempt webhooks, scheduled cron endpoints, OAuth callbacks, and health probes
+    const isExempt =
+      req.path === "/health" ||
+      req.path.startsWith("/api/webhooks/") ||
+      req.path.startsWith("/api/scheduled/") ||
+      req.path.startsWith("/api/oauth/");
+
+    if (stateChanging && !isExempt) {
+      const origin = req.get("origin");
+      const referer = req.get("referer");
+
+      if (origin && !isOriginAllowed(origin)) {
+        logSecurityEvent({
+          type: "CSRF_REJECTED",
+          ip: req.ip,
+          userAgent: req.get("user-agent"),
+          details: { origin, path: req.path, reason: "State-changing request from untrusted origin" },
+          result: "BLOCKED",
+        });
+        res.status(403).json({ error: "CSRF protection: Untrusted origin rejected." });
+        return;
+      }
+
+      if (!origin && referer) {
+        try {
+          const refererOrigin = new URL(referer).origin;
+          if (!isOriginAllowed(refererOrigin)) {
+            logSecurityEvent({
+              type: "CSRF_REJECTED",
+              ip: req.ip,
+              userAgent: req.get("user-agent"),
+              details: { referer, refererOrigin, path: req.path, reason: "State-changing request from untrusted referer" },
+              result: "BLOCKED",
+            });
+            res.status(403).json({ error: "CSRF protection: Untrusted referer rejected." });
+            return;
+          }
+        } catch {
+          // Malformed referer
+          res.status(403).json({ error: "CSRF protection: Invalid referer." });
+          return;
+        }
+      }
+    }
+
+    next();
+  });
+
+  // 5. Health check endpoint for monitoring
+  app.get("/health", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // 6. Register Webhook (with its own 256 KB parser & rate limiter)
   registerMailerooWebhook(app);
-  // A 10 MB document plus base64 transport overhead fits safely below 15 MB.
+
+  // 7. General JSON and URL-Encoded Parsers (15 MB for base64 document upload transport)
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ limit: "15mb", extended: true }));
+
+  // 8. Error handling for oversized payloads (HTTP 413)
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (err && (err.type === "entity.too.large" || err.status === 413)) {
+      res.status(413).json({ error: "Payload Too Large: Request body exceeds size limit." });
+      return;
+    }
+    next(err);
+  });
+
+  // 9. API routes
   app.use("/api/trpc", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
+
   registerStorageProxy(app);
   registerScheduledRoutes(app);
   registerOAuthRoutes(app);
-  // tRPC API
+
+  // 10. tRPC API with rate limiting
   app.use(
     "/api/trpc",
+    apiRateLimiter.middleware(),
     createExpressMiddleware({
       router: appRouter,
       createContext,
     })
   );
-  // development mode uses Vite (if available), production mode uses static files
+
+  // 11. Static files / Vite dev server
   if (process.env.NODE_ENV === "development") {
     try {
       const viteModule = "./vite";
@@ -95,7 +207,7 @@ async function startServer() {
   }
 
   server.listen(port, host, () => {
-    console.log(`Server running on http://${host}:${port}/`);
+    console.log(`[LienGuard] Server running securely on http://${host}:${port}/ (Env: ${process.env.NODE_ENV || "development"})`);
   });
 }
 

@@ -9,12 +9,12 @@ describe("case document validation", () => {
     const document = decodeCaseDocument({
       fileName: "lien-evidence.pdf",
       contentType: "application/pdf",
-      base64: encode("minimal test document"),
+      base64: encode("%PDF-1.7 minimal test document"),
     });
 
     expect(document.fileName).toBe("lien-evidence.pdf");
     expect(document.contentType).toBe("application/pdf");
-    expect(document.bytes.toString("utf8")).toBe("minimal test document");
+    expect(document.bytes.toString("utf8")).toBe("%PDF-1.7 minimal test document");
   });
 
   it("rejects unsupported content types and extension mismatches", () => {

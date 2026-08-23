@@ -63,7 +63,35 @@ export const ENV = {
   deadlineEscalationGraceHours: Math.min(30 * 24, Math.max(1, Number.parseInt(optional("DEADLINE_ESCALATION_GRACE_HOURS") || "48", 10) || 48)),
   emailDeliveryMode: parseEmailDeliveryMode(optional("EMAIL_DELIVERY_MODE").toLowerCase()),
   demoEmailRecipients: parseDemoRecipients(optional("DEMO_EMAIL_RECIPIENTS")),
+  appOrigin: optional("APP_ORIGIN") || optional("LIENGUARD_APP_URL") || "http://localhost:3000",
+  allowedOrigins: optional("ALLOWED_ORIGINS")
+    .split(",")
+    .map(o => o.trim().toLowerCase())
+    .filter(Boolean),
 };
+
+export function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true; // Non-browser / same-origin requests
+  const normalized = origin.trim().toLowerCase();
+
+  // 1. Configured app origins
+  if (ENV.appOrigin && normalized === ENV.appOrigin.toLowerCase()) return true;
+  if (ENV.allowedOrigins.includes(normalized)) return true;
+
+  // 2. In development or local demo, allow localhost and loopback variations
+  if (!ENV.isProduction || ENV.localDemoMode) {
+    if (
+      normalized.startsWith("http://localhost:") ||
+      normalized.startsWith("http://127.0.0.1:") ||
+      normalized.startsWith("https://localhost:") ||
+      normalized.startsWith("https://127.0.0.1:")
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 const emailDeliveryGuard = createEmailDeliveryGuard(
   optional("EMAIL_DELIVERY_MODE"),

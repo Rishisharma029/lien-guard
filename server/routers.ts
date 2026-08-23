@@ -38,6 +38,7 @@ import {
 } from "./db";
 import { getRecommendedAuthority, getCaseTypeAuthorityType, normalizeStateUt } from "./authorityRouting";
 import { analyzeInboundReply } from "./replyIntelligence";
+import { logSecurityEvent } from "./securityLog";
 import { decodeCaseDocument } from "./documents";
 import { deliverQueuedCommunication, runDeadlineAutomation } from "./automation";
 import { isValidEmailAddress } from "./maileroo";
@@ -103,8 +104,15 @@ const updateCaseInput = z.object({
   }
 });
 
-function requireCaseAccess(user: { id: number; role: (typeof userRoles)[number] }, caseRecord: { userId: number }) {
+function requireCaseAccess(user: { id: number; role: (typeof userRoles)[number] }, caseRecord: { userId: number; caseId?: string }) {
   if (!canAccessCase(user.role, user.id, caseRecord.userId)) {
+    logSecurityEvent({
+      type: "UNAUTHORIZED_ACCESS_ATTEMPT",
+      userId: user.id,
+      caseId: caseRecord.caseId,
+      details: { role: user.role, caseOwnerId: caseRecord.userId, reason: "Case access authorization check failed" },
+      result: "BLOCKED",
+    });
     throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this case." });
   }
 }
@@ -142,6 +150,13 @@ export const appRouter = router({
       .input(z.object({ role: z.enum(userRoles).default("citizen") }).optional())
       .mutation(async ({ ctx, input }) => {
         if (ENV.isProduction && !ENV.localDemoMode) {
+          logSecurityEvent({
+            type: "LOGIN_FAILED",
+            ip: ctx.req.ip,
+            userAgent: ctx.req.get("user-agent"),
+            details: { reason: "Demo authentication requested in production" },
+            result: "BLOCKED",
+          });
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Demo authentication is disabled in production.",
@@ -157,7 +172,7 @@ export const appRouter = router({
         const openId = `demo-${role}`;
         const name = roleNames[role] || "LienGuard User";
 
-        await upsertUser({
+        const user = await upsertUser({
           openId,
           name,
           email: `${role}@lienguard.dev`,
@@ -177,11 +192,28 @@ export const appRouter = router({
           maxAge: ONE_YEAR_MS,
         });
 
+        logSecurityEvent({
+          type: "LOGIN_SUCCESS",
+          userId: openId,
+          ip: ctx.req?.ip,
+          userAgent: (typeof ctx.req?.get === "function" ? ctx.req.get("user-agent") : ctx.req?.headers?.["user-agent"] as string) || undefined,
+          details: { role, method: "demo_auth" },
+          result: "SUCCESS",
+        });
+
         return { success: true, role } as const;
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      logSecurityEvent({
+        type: "SESSION_REVOKED",
+        userId: ctx.user?.id,
+        ip: ctx.req?.ip,
+        userAgent: (typeof ctx.req?.get === "function" ? ctx.req.get("user-agent") : ctx.req?.headers?.["user-agent"] as string) || undefined,
+        details: { action: "user_logout" },
+        result: "SUCCESS",
+      });
       return { success: true } as const;
     }),
   }),
@@ -384,7 +416,11 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission to add documents to this case." });
         }
 
-        const document = decodeCaseDocument(input);
+        const document = decodeCaseDocument({
+          ...input,
+          userId: ctx.user.id,
+          caseId: caseRecord.caseId,
+        });
         const uploaded = await storagePut(`lienguard/cases/${caseRecord.id}/${document.fileName}`, document.bytes, document.contentType);
         const saved = await createCaseDocument({
           caseRecordId: caseRecord.id,
@@ -451,11 +487,20 @@ export const appRouter = router({
         }
 
         try {
-          return await changeUserRoleWithAudit({
+          const result = await changeUserRoleWithAudit({
             targetUserId: input.userId,
             changedByUserId: ctx.user.id,
             newRole: input.role,
           });
+          logSecurityEvent({
+            type: "ADMIN_ACTION",
+            userId: ctx.user.id,
+            ip: ctx.req?.ip,
+            userAgent: (typeof ctx.req?.get === "function" ? ctx.req.get("user-agent") : ctx.req?.headers?.["user-agent"] as string) || undefined,
+            details: { action: "role_change", targetUserId: input.userId, newRole: input.role },
+            result: "SUCCESS",
+          });
+          return result;
         } catch (error) {
           if (error instanceof Error && error.message === "User was not found") {
             throw new TRPCError({ code: "NOT_FOUND", message: error.message });

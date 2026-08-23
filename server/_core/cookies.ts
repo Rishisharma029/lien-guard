@@ -8,14 +8,13 @@ function isSecureRequest(req: Request) {
 
 export function getSessionCookieOptions(
   req: Request,
-): Pick<CookieOptions, "httpOnly" | "path" | "sameSite" | "secure"> {
+): Pick<CookieOptions, "httpOnly" | "path" | "sameSite" | "secure" | "maxAge"> {
   const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    // SameSite=None is necessary only for HTTPS embedded-preview contexts.
-    // Local HTTP development uses Lax because browsers reject None without Secure.
-    sameSite: secure ? "none" : "lax",
+    sameSite: "lax",
     secure,
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   };
 }
