@@ -130,6 +130,38 @@ vi.mock("./db", () => ({
   recordInboundEmail: vi.fn(),
   updateCaseDetails: vi.fn(),
   upsertUser: vi.fn(),
+  findActiveAuthorityForRouting: vi.fn(async () => ({
+    id: 12,
+    stateUt: "Haryana",
+    authorityType: "CYBER_CELL",
+    authorityName: "Haryana State Cyber Crime Police Station (PHQ Panchkula)",
+    officerName: "Sh. Sibash Kabiraj",
+    designation: "IPS, ADGP Cyber Haryana",
+    officialEmail: "sp-cybercrimephq.pol@hry.gov.in",
+    phone: "0172-2524058",
+    sourceName: "National Cyber Crime Reporting Portal",
+    sourceUrl: "https://cybercrime.gov.in/",
+    lastVerifiedAt: new Date("2026-08-23"),
+    active: 1,
+  })),
+  recordAuthorityAssignment: vi.fn(async (input: any) => ({
+    id: 1,
+    ...input,
+    assignedAt: new Date(),
+  })),
+  getLatestAuthorityAssignment: vi.fn(async () => ({
+    id: 1,
+    authorityName: "Haryana State Cyber Crime Police Station (PHQ Panchkula)",
+    officerName: "Sh. Sibash Kabiraj",
+    designation: "IPS, ADGP Cyber Haryana",
+    sourceName: "National Cyber Crime Reporting Portal",
+    lastVerifiedAt: new Date("2026-08-23"),
+  })),
+  updateCaseAuthorityDirectoryId: vi.fn(async () => {}),
+  listAuthorityDirectory: vi.fn(async () => []),
+  getAuthorityById: vi.fn(async () => undefined),
+  createAuthorityRecord: vi.fn(),
+  updateAuthorityRecord: vi.fn(),
 }));
 
 vi.mock("./automation", () => ({

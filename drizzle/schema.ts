@@ -17,16 +17,22 @@ export const caseEventTypes = [
   "DEADLINE_ESCALATED",
   "DOCUMENT_UPLOADED",
   "RTI_DRAFT_CREATED",
+  "AUTHORITY_RECOMMENDED",
+  "AUTHORITY_ASSIGNED",
+  "AUTHORITY_CHANGED",
 ] as const;
 export const caseDocumentKinds = ["EVIDENCE", "CORRESPONDENCE", "RTI_DRAFT", "OTHER"] as const;
 export const communicationStates = ["recorded", "queued", "sent", "failed", "received"] as const;
 export const automationActionTypes = ["DEADLINE_FOLLOW_UP", "DEADLINE_ESCALATION"] as const;
+export const authorityTypes = ["CYBER_CELL", "GRIEVANCE_OFFICER", "BANK_NODAL", "OTHER"] as const;
 export type CaseStatus = (typeof caseStatuses)[number];
 export type CasePriority = (typeof casePriorities)[number];
 export type CaseEventType = (typeof caseEventTypes)[number];
 export type CaseDocumentKind = (typeof caseDocumentKinds)[number];
 export type CommunicationState = (typeof communicationStates)[number];
 export type AutomationActionType = (typeof automationActionTypes)[number];
+export type AuthorityType = (typeof authorityTypes)[number];
+
 
 /** Core user record created and refreshed by the Manus OAuth flow. */
 export const users = mysqlTable("users", {
@@ -71,6 +77,7 @@ export const cases = mysqlTable(
     transactionReference: varchar("transaction_reference", { length: 96 }),
     authorityName: varchar("authority_name", { length: 160 }),
     authorityEmail: varchar("authority_email", { length: 320 }),
+    authorityDirectoryId: int("authority_directory_id"),
     responseDeadline: timestamp("response_deadline"),
     status: mysqlEnum("status", caseStatuses).default("OPEN").notNull(),
     priority: mysqlEnum("priority", casePriorities).default("NORMAL").notNull(),
@@ -165,6 +172,58 @@ export const roleChangeAudits = mysqlTable(
   ],
 );
 
+/** Official authority directory — populated from government sources and maintained by admins. */
+export const authorityDirectory = mysqlTable(
+  "authority_directory",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    stateUt: varchar("state_ut", { length: 100 }).notNull(),
+    district: varchar("district", { length: 100 }),
+    authorityType: mysqlEnum("authority_type", authorityTypes).notNull().default("CYBER_CELL"),
+    authorityName: varchar("authority_name", { length: 200 }).notNull(),
+    officerName: varchar("officer_name", { length: 200 }),
+    designation: varchar("designation", { length: 200 }),
+    officialEmail: varchar("official_email", { length: 320 }),
+    phone: varchar("phone", { length: 30 }),
+    sourceName: varchar("source_name", { length: 200 }).notNull(),
+    sourceUrl: varchar("source_url", { length: 512 }).notNull(),
+    lastVerifiedAt: timestamp("last_verified_at").notNull(),
+    active: int("active").default(1).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("authority_directory_state_type_idx").on(table.stateUt, table.authorityType, table.active),
+  ],
+);
+
+/**
+ * Point-in-time snapshot of the authority selected for a case.
+ * Preserved even if the authority_directory entry changes later.
+ */
+export const caseAuthorityAssignments = mysqlTable(
+  "case_authority_assignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    caseId: int("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+    authorityDirectoryId: int("authority_directory_id").references(() => authorityDirectory.id, { onDelete: "set null" }),
+    // Snapshot fields — preserved even if directory entry changes
+    authorityName: varchar("authority_name", { length: 200 }).notNull(),
+    authorityEmail: varchar("authority_email", { length: 320 }),
+    officerName: varchar("officer_name", { length: 200 }),
+    designation: varchar("designation", { length: 200 }),
+    sourceName: varchar("source_name", { length: 200 }).notNull(),
+    sourceUrl: varchar("source_url", { length: 512 }).notNull(),
+    lastVerifiedAt: timestamp("last_verified_at").notNull(),
+    routingReason: varchar("routing_reason", { length: 500 }),
+    assignedByUserId: int("assigned_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  },
+  table => [
+    index("case_authority_assignments_case_idx").on(table.caseId, table.assignedAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type UserNotification = typeof userNotifications.$inferSelect;
@@ -174,3 +233,6 @@ export type CaseCommunication = typeof caseCommunications.$inferSelect;
 export type CaseEvent = typeof caseEvents.$inferSelect;
 export type CaseDocument = typeof caseDocuments.$inferSelect;
 export type CaseAutomationAction = typeof caseAutomationActions.$inferSelect;
+export type AuthorityDirectoryEntry = typeof authorityDirectory.$inferSelect;
+export type CaseAuthorityAssignment = typeof caseAuthorityAssignments.$inferSelect;
+

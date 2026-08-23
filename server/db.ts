@@ -2,6 +2,7 @@ import { and, desc, eq, like, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { randomUUID } from "node:crypto";
 import {
+  AuthorityType,
   AutomationActionType,
   Case,
   CaseCommunication,
@@ -13,6 +14,8 @@ import {
   CaseStatus,
   InsertUser,
   LienGuardRole,
+  authorityDirectory,
+  caseAuthorityAssignments,
   caseAutomationActions,
   caseCommunications,
   caseDocuments,
@@ -362,6 +365,8 @@ export async function updateCaseDetails(input: {
   lienReference?: string | null;
   transactionReference?: string | null;
   authorityName?: string | null;
+  authorityEmail?: string | null;
+  authorityDirectoryId?: number | null;
   responseDeadline?: Date | null;
 }): Promise<Case | undefined> {
   const db = await getDb();
@@ -732,6 +737,7 @@ export async function purgeDemoCases() {
   const ids = demoCases.map(c => c.id);
   await db.transaction(async tx => {
     for (const id of ids) {
+      await tx.delete(caseAuthorityAssignments).where(eq(caseAuthorityAssignments.caseId, id));
       await tx.delete(caseAutomationActions).where(eq(caseAutomationActions.caseId, id));
       await tx.delete(caseEvents).where(eq(caseEvents.caseId, id));
       await tx.delete(caseCommunications).where(eq(caseCommunications.caseId, id));
@@ -742,4 +748,148 @@ export async function purgeDemoCases() {
 
   return ids.length;
 }
+
+// ─── Authority Directory ───────────────────────────────────────────────────
+
+export async function listAuthorityDirectory(filter?: {
+  stateUt?: string;
+  authorityType?: AuthorityType;
+  activeOnly?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(authorityDirectory);
+  const conditions = [];
+  if (filter?.stateUt) conditions.push(eq(authorityDirectory.stateUt, filter.stateUt));
+  if (filter?.authorityType) conditions.push(eq(authorityDirectory.authorityType, filter.authorityType));
+  if (filter?.activeOnly) conditions.push(eq(authorityDirectory.active, 1));
+
+  if (conditions.length) {
+    return query.where(and(...conditions)).orderBy(authorityDirectory.stateUt);
+  }
+  return query.orderBy(authorityDirectory.stateUt);
+}
+
+export async function getAuthorityById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(authorityDirectory).where(eq(authorityDirectory.id, id)).limit(1);
+  return result[0];
+}
+
+export async function findActiveAuthorityForRouting(stateUt: string, authorityType: AuthorityType) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(authorityDirectory)
+    .where(
+      and(
+        eq(authorityDirectory.stateUt, stateUt),
+        eq(authorityDirectory.authorityType, authorityType),
+        eq(authorityDirectory.active, 1),
+      ),
+    )
+    .orderBy(desc(authorityDirectory.lastVerifiedAt))
+    .limit(1);
+  return result[0];
+}
+
+export async function createAuthorityRecord(input: {
+  stateUt: string;
+  district?: string;
+  authorityType: AuthorityType;
+  authorityName: string;
+  officerName?: string;
+  designation?: string;
+  officialEmail?: string;
+  phone?: string;
+  sourceName: string;
+  sourceUrl: string;
+  lastVerifiedAt: Date;
+  active?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const result = await db.insert(authorityDirectory).values({ ...input });
+  return getAuthorityById(Number(result[0].insertId));
+}
+
+export async function updateAuthorityRecord(
+  id: number,
+  input: Partial<{
+    stateUt: string;
+    district: string | null;
+    authorityType: AuthorityType;
+    authorityName: string;
+    officerName: string | null;
+    designation: string | null;
+    officialEmail: string | null;
+    phone: string | null;
+    sourceName: string;
+    sourceUrl: string;
+    lastVerifiedAt: Date;
+    active: number;
+  }>,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db.update(authorityDirectory).set(input).where(eq(authorityDirectory.id, id));
+  return getAuthorityById(id);
+}
+
+// ─── Case Authority Assignments ────────────────────────────────────────────
+
+export async function recordAuthorityAssignment(input: {
+  caseRecordId: number;
+  authorityDirectoryId?: number;
+  authorityName: string;
+  authorityEmail?: string;
+  officerName?: string;
+  designation?: string;
+  sourceName: string;
+  sourceUrl: string;
+  lastVerifiedAt: Date;
+  routingReason?: string;
+  assignedByUserId?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const result = await db.insert(caseAuthorityAssignments).values({
+    caseId: input.caseRecordId,
+    authorityDirectoryId: input.authorityDirectoryId,
+    authorityName: input.authorityName,
+    authorityEmail: input.authorityEmail,
+    officerName: input.officerName,
+    designation: input.designation,
+    sourceName: input.sourceName,
+    sourceUrl: input.sourceUrl,
+    lastVerifiedAt: input.lastVerifiedAt,
+    routingReason: input.routingReason,
+    assignedByUserId: input.assignedByUserId,
+  });
+  const id = Number(result[0].insertId);
+  const rows = await db.select().from(caseAuthorityAssignments).where(eq(caseAuthorityAssignments.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function getLatestAuthorityAssignment(caseRecordId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(caseAuthorityAssignments)
+    .where(eq(caseAuthorityAssignments.caseId, caseRecordId))
+    .orderBy(desc(caseAuthorityAssignments.assignedAt))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateCaseAuthorityDirectoryId(caseRecordId: number, authorityDirectoryId: number | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db.update(cases).set({ authorityDirectoryId }).where(eq(cases.id, caseRecordId));
+}
+
 

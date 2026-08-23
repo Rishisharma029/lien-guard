@@ -50,6 +50,13 @@
       "when": 1787422781655,
       "tag": "0006_mail_delivery_and_deadline_automation",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787500000000,
+      "tag": "0007_authority_directory",
+      "breakpoints": true
     }
   ]
 }

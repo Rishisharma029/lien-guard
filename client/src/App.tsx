@@ -21,6 +21,8 @@ const RtiAssistant = lazy(() => import("@/pages/RtiAssistant"));
 const Timeline = lazy(() => import("@/pages/Timeline"));
 const HackathonDemo = lazy(() => import("@/pages/HackathonDemo"));
 
+const AuthorityDirectory = lazy(() => import("@/pages/AuthorityDirectory"));
+
 function PageLoading() {
   return <main className="grid min-h-screen place-items-center bg-background text-sm font-medium text-muted-foreground">Loading secure workspace…</main>;
 }
@@ -31,6 +33,10 @@ function WorkspaceRoute() {
 
 function UserManagementRoute() {
   return <DashboardLayout><AdminUsers /></DashboardLayout>;
+}
+
+function AuthorityDirectoryRoute() {
+  return <DashboardLayout><AuthorityDirectory /></DashboardLayout>;
 }
 
 function CasesRoute() {
@@ -66,6 +72,7 @@ function Router() {
         <Route path="/escalations" component={EscalationsRoute} />
         <Route path="/rti" component={RtiRoute} />
         <Route path="/admin/users" component={UserManagementRoute} />
+        <Route path="/admin/authority-directory" component={AuthorityDirectoryRoute} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

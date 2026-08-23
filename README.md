@@ -31,6 +31,7 @@
 ## 📑 Table of Contents
 
 - [Overview](#-overview)
+- [🏛️ Official Authority Directory & Intelligent Routing](#-official-government-authority-directory--intelligent-routing)
 - [⚖️ Compliance-Aware Workflow](#-compliance-aware-workflow)
 - [📨 Intelligent Inbound Email & AI Reply Processing](#-intelligent-inbound-email--ai-reply-processing)
 - [⚡ Hackathon Demo Mode](#-hackathon-demo-mode)
@@ -54,6 +55,38 @@ Instead of fragmented offline communications, LienGuard creates a **secure, audi
 - Tracks statutory response deadlines and automates escalation warnings.
 - Dispatches case-linked notices with unique identifiers (`[LG-YYYY-XXXXXXXXXXXX]`) via Maileroo REST API and SMTP over TLS.
 - Ingests inbound replies via Maileroo Webhooks, verifies SPF/DKIM/DMARC, matches the exact case, and runs **AI-Assisted Reply Analysis** to extract document requirements and suggest next procedural actions.
+
+---
+
+## 🏛️ Official Government Authority Directory & Intelligent Routing
+
+LienGuard includes an authentic, database-driven **Authority Directory** with all **36 Indian States and Union Territories** sourced directly from the **National Cyber Crime Reporting Portal (cybercrime.gov.in)**:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ 🛡 RECOMMENDED OFFICIAL GOVERNMENT AUTHORITY             │
+│                                                          │
+│ Haryana State Cyber Crime Police Station (PHQ Panchkula) │
+│ State: Haryana   •   Type: Cyber Cell (CYBER_CELL)       │
+│                                                          │
+│ Designated Officer: Sh. Sibash Kabiraj                   │
+│ Designation / Rank: IPS, ADGP Cyber Haryana              │
+│ Official Email: sp-cybercrimephq.pol@hry.gov.in          │
+│ Official Phone: 0172-2524058                             │
+│                                                          │
+│ ✓ Source: National Cyber Crime Reporting Portal          │
+│ Verified: 23 Aug 2026   •   URL: https://cybercrime.gov.in/│
+│                                                          │
+│ [ ✓ Accept & Assign ]   [ View Official Source ]         │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Capabilities:
+- **36 States & UTs Sourced Directly**: Authentic government records for every Indian state/UT (e.g. Haryana: *Sh. Sibash Kabiraj, IPS, ADGP Cyber Haryana*; Delhi: *Sh. Vinit Kumar, IPS, DCP/IFSO*; Maharashtra: *Sh. Sanjay Shintre, DIG Cyber Crime*).
+- **Deterministic Auto-Routing**: Matches case `stateUt` + `caseType` with state normalization (handles `"haryana"`, `"HARYANA"`, `"ap"` &rarr; `"Andhra Pradesh"`, `"delhi"`, etc.) without hallucinations.
+- **Point-in-Time Assignment Snapshot**: Stores an immutable snapshot (`case_authority_assignments`) at the moment of assignment, ensuring historical preservation even if directory records are updated.
+- **Strict Verification & Zero Fabrication**: No fabricated officer names, fake emails, or simulated numbers. Records are attributed to official sources with `last_verified_at` timestamps.
+- **Admin Directory Governance**: Full administrative UI (`/admin/authority-directory`) to add, edit, verify, deactivate, and reactivate authority records.
 
 ---
 

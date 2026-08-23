@@ -496,11 +496,31 @@ export default function HackathonDemo() {
             </div>
 
             {demoCase && (
-              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-900 dark:text-blue-200">
-                <p className="font-bold">Lien Details:</p>
-                <p className="mt-0.5 text-muted-foreground">
-                  Amount: <strong className="text-foreground">INR 1,50,000.00</strong> • Bank: <strong className="text-foreground">{demoCase.bankName}</strong> • Authority: <strong className="text-foreground">{demoCase.authorityName}</strong>
-                </p>
+              <div className="space-y-2">
+                <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-900 dark:text-blue-200">
+                  <p className="font-bold">Lien Details:</p>
+                  <p className="mt-0.5 text-muted-foreground">
+                    Amount: <strong className="text-foreground">INR 1,50,000.00</strong> • Bank: <strong className="text-foreground">{demoCase.bankName}</strong>
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-950 dark:text-emerald-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      Official Government Authority Routed:
+                    </span>
+                    <Badge className="bg-emerald-600 text-white text-[9px] border-0">Haryana (Cyber Cell)</Badge>
+                  </div>
+                  <p className="font-semibold text-foreground">{demoState?.latestAssignment?.authorityName || demoCase.authorityName}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Officer: <strong>{demoState?.latestAssignment?.officerName || "Sh. Sibash Kabiraj"}</strong> ({demoState?.latestAssignment?.designation || "IPS, ADGP Cyber Haryana"})
+                  </p>
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-300 pt-0.5 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Verified from {demoState?.latestAssignment?.sourceName || "National Cyber Crime Reporting Portal (cybercrime.gov.in)"} on 23 Aug 2026
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>

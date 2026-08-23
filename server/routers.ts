@@ -1,19 +1,24 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { caseDocumentKinds, casePriorities, caseStatuses, userRoles } from "../drizzle/schema";
+import { authorityTypes, caseDocumentKinds, casePriorities, caseStatuses, userRoles } from "../drizzle/schema";
 import { canAccessCase, canUpdateCaseDetails, canUpdateCaseStatus, createCaseTimeline, getCaseHealth, isCaseStatusTransitionAllowed } from "./cases";
 import {
   changeUserRoleWithAudit,
+  createAuthorityRecord,
   createCase,
   createCaseDocument,
   createOutboundEmail,
   createUserNotification,
+  findActiveAuthorityForRouting,
+  getAuthorityById,
   getCaseById,
   getCaseByReference,
   getCaseCommunicationById,
+  getLatestAuthorityAssignment,
   getLatestDemoCase,
   getNotificationsForUser,
   getRoleChangeAudits,
+  listAuthorityDirectory,
   listCaseCommunications,
   listCaseDocuments,
   listCaseEvents,
@@ -21,13 +26,17 @@ import {
   listUsersForAdmin,
   markNotificationRead,
   purgeDemoCases,
+  recordAuthorityAssignment,
   recordCaseFollowUp,
   recordInboundEmail,
   recordSystemCaseEvent,
   setCaseStatus,
+  updateAuthorityRecord,
+  updateCaseAuthorityDirectoryId,
   updateCaseDetails,
   upsertUser,
 } from "./db";
+import { getRecommendedAuthority, getCaseTypeAuthorityType, normalizeStateUt } from "./authorityRouting";
 import { analyzeInboundReply } from "./replyIntelligence";
 import { decodeCaseDocument } from "./documents";
 import { deliverQueuedCommunication, runDeadlineAutomation } from "./automation";
@@ -61,6 +70,8 @@ const createCaseInput = z.object({
   description: z.string().trim().min(10).max(5000),
   caseType: z.string().trim().min(2).max(80),
   priority: z.enum(casePriorities).default("NORMAL"),
+  stateUt: z.string().trim().min(2).max(100).optional(),
+  district: z.string().trim().min(2).max(100).optional(),
   bankName: z.string().trim().min(2).max(160).optional(),
   lienAmount: z.string().trim().regex(/^\d+(?:\.\d{1,2})?$/, "Enter a valid lien amount.").optional(),
   lienDate: optionalDate,
@@ -220,9 +231,31 @@ export const appRouter = router({
     create: protectedProcedure
       .input(createCaseInput)
       .mutation(async ({ ctx, input }) => {
-        const created = await createCase({ userId: ctx.user.id, ...input });
+        const { stateUt, district, ...caseInput } = input;
+        const created = await createCase({ userId: ctx.user.id, ...caseInput });
         if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Case could not be created." });
-        return created;
+
+        // Run deterministic authority routing if state/UT provided
+        let routingRecommendation: Awaited<ReturnType<typeof getRecommendedAuthority>> = null;
+        if (stateUt) {
+          try {
+            routingRecommendation = await getRecommendedAuthority(
+              { stateUt, caseType: input.caseType, district },
+              (st, at) => findActiveAuthorityForRouting(st, at),
+            );
+            if (routingRecommendation) {
+              await recordSystemCaseEvent({
+                caseRecordId: created.id,
+                type: "AUTHORITY_RECOMMENDED",
+                message: `Authority recommended: ${routingRecommendation.authority.authorityName} (${routingRecommendation.canonicalStateUt})`,
+              });
+            }
+          } catch {
+            // Routing failure must never block case creation
+          }
+        }
+
+        return { ...created, routingRecommendation };
       }),
     update: protectedProcedure
       .input(updateCaseInput)
@@ -431,6 +464,179 @@ export const appRouter = router({
         }
       }),
   }),
+  authorityDirectory: router({
+    /** Deterministic routing — find the best official authority for a State/UT + case type. */
+    recommend: protectedProcedure
+      .input(z.object({
+        stateUt: z.string().trim().min(2).max(100),
+        caseType: z.string().trim().min(2).max(80),
+        district: z.string().trim().min(2).max(100).optional(),
+      }))
+      .query(async ({ input }) => {
+        const result = await getRecommendedAuthority(
+          { stateUt: input.stateUt, caseType: input.caseType, district: input.district },
+          (st, at) => findActiveAuthorityForRouting(st, at),
+        );
+        if (!result) {
+          return {
+            found: false as const,
+            canonicalStateUt: normalizeStateUt(input.stateUt),
+            message: "Authority information is currently unavailable for this State/UT. Please select or enter an authority manually.",
+          };
+        }
+        return { found: true as const, ...result };
+      }),
+
+    /** Assign a directory authority to a case — records immutable snapshot + timeline event. */
+    assignToCase: protectedProcedure
+      .input(z.object({
+        caseId: z.string().trim().min(4).max(32),
+        authorityDirectoryId: z.number().int().positive(),
+        routingReason: z.string().trim().max(500).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        requireCaseAccess(ctx.user, caseRecord);
+
+        const authority = await getAuthorityById(input.authorityDirectoryId);
+        if (!authority || !authority.active) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Authority not found or is inactive." });
+        }
+
+        const previousAssignment = await getLatestAuthorityAssignment(caseRecord.id);
+        const isChange = Boolean(previousAssignment);
+
+        // Write point-in-time snapshot
+        const assignment = await recordAuthorityAssignment({
+          caseRecordId: caseRecord.id,
+          authorityDirectoryId: authority.id,
+          authorityName: authority.authorityName,
+          authorityEmail: authority.officialEmail || undefined,
+          officerName: authority.officerName || undefined,
+          designation: authority.designation || undefined,
+          sourceName: authority.sourceName,
+          sourceUrl: authority.sourceUrl,
+          lastVerifiedAt: authority.lastVerifiedAt,
+          routingReason: input.routingReason || `Assigned from official directory: ${authority.sourceName}`,
+          assignedByUserId: ctx.user.id,
+        });
+
+        // Update live case fields used by communications workflow
+        await updateCaseDetails({
+          caseId: caseRecord.caseId,
+          actorUserId: ctx.user.id,
+          authorityName: authority.authorityName,
+          authorityEmail: authority.officialEmail || null,
+        });
+        await updateCaseAuthorityDirectoryId(caseRecord.id, authority.id);
+
+        await recordSystemCaseEvent({
+          caseRecordId: caseRecord.id,
+          type: isChange ? "AUTHORITY_CHANGED" : "AUTHORITY_ASSIGNED",
+          message: `${isChange ? "Authority changed" : "Authority assigned"}: ${authority.authorityName} (${authority.stateUt}) — Source: ${authority.sourceName}`,
+        });
+
+        return { success: true, assignment };
+      }),
+
+    /** Get the latest authority assignment snapshot for a case. */
+    getAssignment: protectedProcedure
+      .input(caseReferenceInput)
+      .query(async ({ ctx, input }) => {
+        const caseRecord = await getCaseByReference(input.caseId);
+        if (!caseRecord) throw new TRPCError({ code: "NOT_FOUND", message: "Case was not found." });
+        requireCaseAccess(ctx.user, caseRecord);
+        const assignment = await getLatestAuthorityAssignment(caseRecord.id);
+        return assignment || null;
+      }),
+
+    /** Admin: list all authority directory entries. */
+    list: adminProcedure
+      .input(z.object({
+        stateUt: z.string().trim().min(1).max(100).optional(),
+        authorityType: z.enum(authorityTypes).optional(),
+        activeOnly: z.boolean().default(false),
+      }).optional())
+      .query(async ({ input }) => {
+        return listAuthorityDirectory({
+          stateUt: input?.stateUt,
+          authorityType: input?.authorityType,
+          activeOnly: input?.activeOnly ?? false,
+        });
+      }),
+
+    /** Admin: get single authority record by ID. */
+    get: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const entry = await getAuthorityById(input.id);
+        if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Authority record not found." });
+        return entry;
+      }),
+
+    /** Admin: create a new authority directory record. */
+    create: adminProcedure
+      .input(z.object({
+        stateUt: z.string().trim().min(2).max(100),
+        district: z.string().trim().min(2).max(100).optional(),
+        authorityType: z.enum(authorityTypes),
+        authorityName: z.string().trim().min(2).max(200),
+        officerName: z.string().trim().min(2).max(200).optional(),
+        designation: z.string().trim().min(2).max(200).optional(),
+        officialEmail: z.string().trim().email().max(320).optional(),
+        phone: z.string().trim().min(5).max(30).optional(),
+        sourceName: z.string().trim().min(2).max(200),
+        sourceUrl: z.string().trim().url().max(512),
+        lastVerifiedAt: z.coerce.date(),
+      }))
+      .mutation(async ({ input }) => {
+        const created = await createAuthorityRecord(input);
+        if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Authority record could not be created." });
+        return created;
+      }),
+
+    /** Admin: update an existing authority record. */
+    update: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        stateUt: z.string().trim().min(2).max(100).optional(),
+        district: z.string().trim().min(2).max(100).nullable().optional(),
+        authorityType: z.enum(authorityTypes).optional(),
+        authorityName: z.string().trim().min(2).max(200).optional(),
+        officerName: z.string().trim().min(2).max(200).nullable().optional(),
+        designation: z.string().trim().min(2).max(200).nullable().optional(),
+        officialEmail: z.string().trim().email().max(320).nullable().optional(),
+        phone: z.string().trim().min(5).max(30).nullable().optional(),
+        sourceName: z.string().trim().min(2).max(200).optional(),
+        sourceUrl: z.string().trim().url().max(512).optional(),
+        lastVerifiedAt: z.coerce.date().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updates } = input;
+        const existing = await getAuthorityById(id);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Authority record not found." });
+        return updateAuthorityRecord(id, updates);
+      }),
+
+    /** Admin: deactivate (soft-delete) an authority record. */
+    deactivate: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input }) => {
+        const existing = await getAuthorityById(input.id);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Authority record not found." });
+        return updateAuthorityRecord(input.id, { active: 0 });
+      }),
+
+    /** Admin: reactivate a deactivated authority record. */
+    reactivate: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input }) => {
+        const existing = await getAuthorityById(input.id);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Authority record not found." });
+        return updateAuthorityRecord(input.id, { active: 1 });
+      }),
+  }),
   demo: router({
     isDemo: publicProcedure.query(() => !ENV.isProduction || ENV.localDemoMode),
     getState: protectedProcedure.query(async ({ ctx }) => {
@@ -448,10 +654,11 @@ export const appRouter = router({
         };
       }
 
-      const [events, communications, documents] = await Promise.all([
+      const [events, communications, documents, latestAssignment] = await Promise.all([
         listCaseEvents(demoCase.id),
         listCaseCommunications(demoCase.id),
         listCaseDocuments(demoCase.id),
+        getLatestAuthorityAssignment(demoCase.id),
       ]);
 
       let step = 1; // 1: Registered
@@ -481,6 +688,7 @@ export const appRouter = router({
         events,
         communications,
         documents,
+        latestAssignment: latestAssignment || null,
         step,
         latestInboundAnalysis,
         emailDeliveryMode: ENV.emailDeliveryMode,
@@ -497,6 +705,8 @@ export const appRouter = router({
       await purgeDemoCases();
 
       const authorityEmail = Array.from(ENV.demoEmailRecipients)[0] || "demo-authority@local.invalid";
+      const officialHaryana = await findActiveAuthorityForRouting("Haryana", "CYBER_CELL");
+
       const created = await createCase({
         userId: ctx.user.id,
         title: "[HACKATHON DEMO] Unauthorized Bank Account Lien — Case Investigation",
@@ -508,14 +718,48 @@ export const appRouter = router({
         lienDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
         lienReference: "LIEN-DEMO-2026-9812",
         transactionReference: "TXN-DEMO-88492014",
-        authorityName: "Cyber Crime Investigation Cell (District Cyber Unit)",
+        authorityName: officialHaryana?.authorityName || "Haryana State Cyber Crime Police Station (PHQ Panchkula)",
         authorityEmail,
         responseDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
         initialStatus: "AWAITING_RESPONSE",
       });
 
       if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create demo case." });
-      return { success: true, case: created };
+
+      // Record official recommendation event
+      await recordSystemCaseEvent({
+        caseRecordId: created.id,
+        type: "AUTHORITY_RECOMMENDED",
+        message: `Official Authority Recommended: ${officialHaryana?.authorityName || "Haryana State Cyber Crime Police Station"} (Haryana) — Source: National Cyber Crime Reporting Portal`,
+      });
+
+      // Record point-in-time assignment snapshot
+      await recordAuthorityAssignment({
+        caseRecordId: created.id,
+        authorityDirectoryId: officialHaryana?.id,
+        authorityName: officialHaryana?.authorityName || "Haryana State Cyber Crime Police Station (PHQ Panchkula)",
+        authorityEmail: officialHaryana?.officialEmail || "sp-cybercrimephq.pol@hry.gov.in",
+        officerName: officialHaryana?.officerName || "Sh. Sibash Kabiraj",
+        designation: officialHaryana?.designation || "IPS, ADGP Cyber Haryana",
+        sourceName: "National Cyber Crime Reporting Portal",
+        sourceUrl: "https://cybercrime.gov.in/",
+        lastVerifiedAt: officialHaryana?.lastVerifiedAt || new Date("2026-08-23"),
+        routingReason: "Deterministic match: State/UT = Haryana, Category = Cyber Crime Lien",
+        assignedByUserId: ctx.user.id,
+      });
+
+      if (officialHaryana?.id) {
+        await updateCaseAuthorityDirectoryId(created.id, officialHaryana.id);
+      }
+
+      await recordSystemCaseEvent({
+        caseRecordId: created.id,
+        type: "AUTHORITY_ASSIGNED",
+        message: `Official Authority Assigned: ${officialHaryana?.authorityName || "Haryana State Cyber Crime Police Station"} — Officer: ${officialHaryana?.officerName || "Sh. Sibash Kabiraj (ADGP Cyber)"}`,
+      });
+
+      const updated = await getCaseByReference(created.caseId);
+      return { success: true, case: updated || created };
     }),
     sendFollowUp: protectedProcedure
       .input(z.object({ caseId: z.string().trim().min(4).max(32) }))
