@@ -27,6 +27,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { SEO } from "@/components/SEO";
 
 export default function HackathonDemo() {
   const [, navigate] = useLocation();
@@ -128,6 +129,11 @@ export default function HackathonDemo() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-16">
+      <SEO
+        title="⚡ Hackathon Demo — 5-Minute LienGuard Demonstration"
+        description="Experience the end-to-end statutory lien workflow in 5 clicks: case registration, authority routing, two-way email, escalation, and RTI generation."
+        canonical="https://lienguard.org/demo"
+      />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

@@ -1,17 +1,17 @@
 import { SEO } from "@/components/SEO";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Compass, Home, Zap, Landmark, ArrowRight } from "lucide-react";
+import { ShieldCheck, CheckCircle2, ArrowRight, FolderKanban, Landmark } from "lucide-react";
 import { useLocation } from "wouter";
 
-export default function NotFound() {
+export default function ThankYou() {
   const [, navigate] = useLocation();
 
   return (
     <div className="min-h-screen bg-[#f4f6f8] text-[#132f4d] flex flex-col justify-between">
       <SEO
-        title="LienGuard — Page Not Found (404)"
-        description="The requested page could not be found."
+        title="Thank You — LienGuard"
+        description="Your submission has been received successfully."
         noindex={true}
       />
 
@@ -23,48 +23,40 @@ export default function NotFound() {
           </span>
           <div>
             <span className="block text-sm font-extrabold tracking-tight">LienGuard</span>
-            <span className="eyebrow block text-[0.48rem] text-[#7b8b9c]">Case intelligence</span>
+            <span className="eyebrow block text-[0.48rem] text-[#7b8b9c]">Confirmation</span>
           </div>
         </button>
       </header>
 
-      {/* Main Container */}
+      {/* Main Content */}
       <main className="flex-1 grid place-items-center px-4 py-16">
         <div className="w-full max-w-lg rounded-2xl border border-[#dce3eb] bg-white p-8 sm:p-10 shadow-xl text-center space-y-6">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#e8f0fa] text-[#124b79] border border-[#dce3eb]">
-            <Compass className="h-8 w-8 animate-pulse text-[#0f2b4b]" />
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+            <CheckCircle2 className="h-9 w-9" />
           </div>
 
           <div className="space-y-2">
-            <span className="eyebrow text-xs text-[#7b8b9c]">Error 404 • Resource Not Found</span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0f2b4b]">
-              Looks like this case took a wrong turn.
+              Thank You.
             </h1>
             <p className="text-sm text-[#556980] leading-relaxed">
-              The page you're looking for doesn't exist, has been archived, or may have moved to a different statutory route.
+              Your request or inquiry has been received and logged in our system. If this inquiry relates to a case record, you can track its progress directly from your secure workspace.
             </p>
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
             <Button
               onClick={() => navigate("/workspace")}
-              className="bg-[#0f2b4b] hover:bg-[#163b63] text-white font-bold h-11 px-6 rounded-xl shadow"
+              className="bg-[#0f2b4b] hover:bg-[#163b63] text-white font-bold h-11 px-6 rounded-xl"
             >
-              <Home className="h-4 w-4 mr-2" /> Go to Dashboard
+              <FolderKanban className="h-4 w-4 mr-2" /> Open Case Workspace
             </Button>
             <Button
               variant="outline"
-              onClick={() => navigate("/directory")}
-              className="border-[#dce3eb] text-[#132f4d] font-semibold h-11 px-5 rounded-xl"
+              onClick={() => navigate("/")}
+              className="border-[#dce3eb] text-[#132f4d] font-semibold h-11 px-6 rounded-xl"
             >
-              <Landmark className="h-4 w-4 mr-2" /> Cyber Directory
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate("/demo")}
-              className="border-amber-500/30 bg-amber-500/10 text-amber-800 font-semibold h-11 px-5 rounded-xl"
-            >
-              <Zap className="h-4 w-4 mr-1.5" /> 5-Min Demo
+              Return Home
             </Button>
           </div>
         </div>

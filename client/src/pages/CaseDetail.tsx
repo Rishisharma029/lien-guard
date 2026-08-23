@@ -26,6 +26,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
+import { SEO } from "@/components/SEO";
 
 const INDIAN_STATES_AND_UTS = [
   "Andaman and Nicobar Islands",
@@ -234,6 +235,11 @@ export default function CaseDetail() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
+      <SEO
+        title="Case Details — LienGuard"
+        description="Secure statutory matter record"
+        noindex={true}
+      />
       <button
         onClick={() => navigate("/cases")}
         className="flex items-center gap-2 text-sm font-semibold text-[#43637d] hover:text-[#143e65]"

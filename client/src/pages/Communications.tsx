@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { SEO } from "@/components/SEO";
 
 const stamp = (date: Date | string) =>
   new Date(date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -163,6 +164,11 @@ export default function Communications() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      <SEO
+        title="Case Communications — LienGuard"
+        description="Case communications and correspondence"
+        noindex={true}
+      />
       <section>
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
           ⚖️ Compliance-Aware Workflow

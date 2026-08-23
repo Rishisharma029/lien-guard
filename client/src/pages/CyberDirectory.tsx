@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { SEO } from "@/components/SEO";
 
 export default function CyberDirectory() {
   const [, navigate] = useLocation();
@@ -51,6 +52,11 @@ export default function CyberDirectory() {
 
   return (
     <div className="space-y-8">
+      <SEO
+        title="Official State & UT Cyber Crime Directory — LienGuard"
+        description="Official directory of Cyber Crime Police Stations, Nodal Officers & State Cyber Cells across all 36 Indian States and Union Territories sourced from cybercrime.gov.in."
+        canonical="https://lienguard.org/directory"
+      />
       {/* 1. Header & Emergency Banner */}
       <div className="rounded-2xl border border-[#dce3eb] bg-gradient-to-r from-[#0f2b4b] via-[#163b63] to-[#1c4777] p-6 sm:p-8 text-white shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">

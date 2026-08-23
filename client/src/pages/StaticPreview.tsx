@@ -1,5 +1,6 @@
 import { ArrowLeft, Bell, CheckCircle2, Clock3, FileText, Gavel, Landmark, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
+import { SEO } from "@/components/SEO";
 
 const cases = [
   { reference: "LG-DEMO-ESC-001", title: "Authority response overdue", bank: "Demo Bank", amount: "₹250,000", status: "Escalated", deadline: "Overdue", tone: "bg-rose-50 text-rose-700" },
@@ -11,6 +12,7 @@ export default function StaticPreview() {
   const [, navigate] = useLocation();
 
   return <main className="min-h-screen bg-[#f4f6f8] text-[#132f4d]">
+    <SEO title="LienGuard Static Preview" description="Static interface preview" noindex={true} />
     <header className="flex min-h-16 items-center justify-between border-b border-[#dce3eb] bg-white px-4 sm:px-7">
       <button onClick={() => navigate("/")} className="flex items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f2b4b]">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0f2b4b] text-white"><ShieldCheck className="h-4 w-4" /></span>

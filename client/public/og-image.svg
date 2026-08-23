@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1627"/>
+      <stop offset="50%" stop-color="#0f2b4b"/>
+      <stop offset="100%" stop-color="#163b63"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#bcff6b"/>
+      <stop offset="100%" stop-color="#7dfa92"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern overlay -->
+  <g opacity="0.1" stroke="#ffffff" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="500" y1="0" x2="500" y2="630"/>
+    <line x1="700" y1="0" x2="700" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="1100" y1="0" x2="1100" y2="630"/>
+    <line x1="0" y1="100" x2="1200" y2="100"/>
+    <line x1="0" y1="250" x2="1200" y2="250"/>
+    <line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="550" x2="1200" y2="550"/>
+  </g>
+
+  <!-- Top Badge -->
+  <g transform="translate(100, 90)">
+    <rect width="320" height="40" rx="20" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.2"/>
+    <circle cx="25" cy="20" r="6" fill="#bcff6b"/>
+    <text x="45" y="25" fill="#bcff6b" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700" letter-spacing="1">CIVIC DISPUTE GOVERNANCE</text>
+  </g>
+
+  <!-- Main Headline -->
+  <text x="100" y="210" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" letter-spacing="-1">LIENGUARD</text>
+
+  <!-- Subheadline -->
+  <text x="100" y="280" fill="#dce6f2" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="700">
+    Statutory Lien &amp; Cyber Dispute Platform
+  </text>
+
+  <text x="100" y="340" fill="#9eb6ce" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="400">
+    Official Authority Routing • 48h Deadline Tracking • Two-Way Maileroo Intelligence
+  </text>
+
+  <!-- Feature Pills -->
+  <g transform="translate(100, 420)">
+    <!-- Pill 1 -->
+    <rect x="0" y="0" width="280" height="54" rx="12" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15"/>
+    <text x="20" y="34" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600">✓ Immutable Audit Events</text>
+
+    <!-- Pill 2 -->
+    <rect x="300" y="0" width="310" height="54" rx="12" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15"/>
+    <text x="320" y="34" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600">✓ 36 State/UT Cyber Routing</text>
+
+    <!-- Pill 3 -->
+    <rect x="630" y="0" width="290" height="54" rx="12" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15"/>
+    <text x="650" y="34" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600">✓ Review-Only RTI Drafts</text>
+  </g>
+
+  <!-- Bottom Bar -->
+  <line x1="100" y1="530" x2="1100" y2="530" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1"/>
+  <text x="100" y="575" fill="#7b91ab" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="500">
+    Dial 1930 National Cyber Helpline • Verified: cybercrime.gov.in
+  </text>
+  <text x="1100" y="575" text-anchor="end" fill="#bcff6b" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="700">
+    lienguard.org
+  </text>
+</svg>

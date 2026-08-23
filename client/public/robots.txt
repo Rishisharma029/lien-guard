@@ -1,0 +1,31 @@
+# LienGuard Robots.txt
+# Public pages are indexable. Private authenticated case workspaces are disallowed.
+
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /contact
+Allow: /directory
+Allow: /cybercrime-directory
+Allow: /demo
+Allow: /privacy
+Allow: /terms
+Allow: /thank-you
+
+# Disallow authenticated application workspaces and sensitive case data
+Disallow: /workspace
+Disallow: /cases
+Disallow: /cases/
+Disallow: /documents
+Disallow: /documents/
+Disallow: /communications
+Disallow: /communications/
+Disallow: /timeline
+Disallow: /escalations
+Disallow: /rti
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /trpc/
+
+Sitemap: https://lienguard.org/sitemap.xml

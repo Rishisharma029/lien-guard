@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { SEO } from "@/components/SEO";
 
 const INDIAN_STATES_AND_UTS = [
   "All States & UTs",
@@ -163,6 +164,11 @@ export default function AuthorityDirectory() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
+      <SEO
+        title="Authority Directory Governance — LienGuard"
+        description="Admin authority directory management"
+        noindex={true}
+      />
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="flex items-center gap-2">

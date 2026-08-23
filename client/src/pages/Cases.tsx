@@ -14,6 +14,7 @@ import { AlertCircle, FilePlus2, Filter, Plus, RotateCw, ShieldCheck } from "luc
 import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { SEO } from "@/components/SEO";
 
 const INDIAN_STATES_AND_UTS = [
   "Andaman and Nicobar Islands",
@@ -410,6 +411,11 @@ export default function Cases() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
+      <SEO
+        title="My Cases — LienGuard"
+        description="Case register and statutory matters"
+        noindex={true}
+      />
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="eyebrow text-[#688096]">Case register</p>

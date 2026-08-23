@@ -23,6 +23,12 @@ const HackathonDemo = lazy(() => import("@/pages/HackathonDemo"));
 
 const AuthorityDirectory = lazy(() => import("@/pages/AuthorityDirectory"));
 const CyberDirectory = lazy(() => import("@/pages/CyberDirectory"));
+const About = lazy(() => import("@/pages/About"));
+const Contact = lazy(() => import("@/pages/Contact"));
+const ThankYou = lazy(() => import("@/pages/ThankYou"));
+const Privacy = lazy(() => import("@/pages/Privacy"));
+const Terms = lazy(() => import("@/pages/Terms"));
+import { CookieBanner } from "./components/CookieBanner";
 
 function PageLoading() {
   return <main className="grid min-h-screen place-items-center bg-background text-sm font-medium text-muted-foreground">Loading secure workspace…</main>;
@@ -66,6 +72,11 @@ function Router() {
     <Suspense fallback={<PageLoading />}>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/about" component={About} />
+        <Route path="/contact" component={Contact} />
+        <Route path="/thank-you" component={ThankYou} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/terms" component={Terms} />
         <Route path="/preview" component={StaticPreview} />
         <Route path="/workspace" component={WorkspaceRoute} />
         <Route path="/demo" component={DemoRoute} />
@@ -94,6 +105,7 @@ export default function App() {
         <TooltipProvider>
           <Toaster richColors position="top-right" />
           <Router />
+          <CookieBanner />
           <ThemeToggle />
         </TooltipProvider>
       </ThemeProvider>
