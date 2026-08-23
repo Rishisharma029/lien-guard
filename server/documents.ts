@@ -13,8 +13,9 @@ const allowedDocumentTypes = new Map<string, readonly string[]>([
 ]);
 
 export function sanitizeDocumentFileName(fileName: string) {
-  // Prevent directory traversal and strip non-printable or forbidden filesystem characters
-  const baseName = basename(fileName.trim()).replace(/[\u0000-\u001f<>:"/\\|?*]+/g, "_");
+  // Prevent directory traversal across Windows and POSIX path separators
+  const normalizedSeparators = fileName.trim().replace(/\\+/g, "/");
+  const baseName = basename(normalizedSeparators).replace(/[\u0000-\u001f<>:"/\\|?*]+/g, "_");
   const normalized = baseName.replace(/\s+/g, " ").slice(0, 255);
   if (!normalized || normalized === "." || normalized === "..") {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Provide a valid document file name." });
