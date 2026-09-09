@@ -172,14 +172,18 @@ export const appRouter = router({
         const openId = `demo-${role}`;
         const name = roleNames[role] || "LienGuard User";
 
-        const user = await upsertUser({
-          openId,
-          name,
-          email: `${role}@lienguard.dev`,
-          role,
-          loginMethod: "demo_auth",
-          lastSignedIn: new Date(),
-        });
+        try {
+          await upsertUser({
+            openId,
+            name,
+            email: `${role}@lienguard.dev`,
+            role,
+            loginMethod: "demo_auth",
+            lastSignedIn: new Date(),
+          });
+        } catch (dbErr) {
+          console.warn("[DemoAuth] Database offline, continuing with token-based session");
+        }
 
         const token = await sdk.createSessionToken(openId, {
           name,

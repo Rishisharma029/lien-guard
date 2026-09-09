@@ -39,37 +39,28 @@ const rolePaths = [
 export default function Home() {
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
 
-  const demoLogin = trpc.auth.demoLogin.useMutation({
-    onSuccess: () => { navigate("/workspace"); },
-    onError: () => { navigate("/workspace"); },
-  });
+  const demoLogin = trpc.auth.demoLogin.useMutation();
 
-  const openWorkspace = (role: "citizen" | "bank" | "authority" | "admin" = "citizen", redirectTo = "/workspace") => {
+  const openWorkspace = async (role: "citizen" | "bank" | "authority" | "admin" = "citizen", redirectTo = "/workspace") => {
     trackEvent("demo_started", { role, target: redirectTo });
 
-    if (redirectTo === "/directory" || redirectTo === "/cybercrime-directory" || redirectTo === "/demo" || redirectTo === "/cases") {
-      navigate(redirectTo);
-      return;
-    }
-
     const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-    if (oauthPortalUrl && !oauthPortalUrl.includes("example.com")) {
+    if (oauthPortalUrl && !oauthPortalUrl.includes("example.com") && !window.location.hostname.includes("localhost")) {
       startLogin();
       return;
     }
 
-    demoLogin.mutate(
-      { role },
-      {
-        onSuccess: () => {
-          navigate(redirectTo);
-        },
-        onError: () => {
-          navigate(redirectTo);
-        },
-      }
-    );
+    try {
+      await demoLogin.mutateAsync({ role });
+      await utils.auth.me.invalidate();
+      await utils.auth.me.refetch();
+    } catch {
+      // Continue navigation even if mutation catches
+    } finally {
+      navigate(redirectTo);
+    }
   };
 
   useEffect(() => { if (isAuthenticated) navigate("/workspace"); }, [isAuthenticated, navigate]);

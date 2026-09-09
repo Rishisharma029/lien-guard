@@ -6,6 +6,7 @@
 
 ### Enterprise Statutory Lien Governance, Compliance-Aware Workflow & Inbound Email Intelligence
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-2ea44f?style=for-the-badge&logo=github&logoColor=white)](https://rishisharma029.github.io/lien-guard/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](./LICENSE)
 [![React](https://img.shields.io/badge/React-19.x-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.x-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -19,7 +20,11 @@
   A secure, full-stack, compliance-aware platform for statutory bank account liens, police inquiry notices, and dispute resolution with two-way email intelligence, automated audit trails, and review-only RTI generation.
 </p>
 
-[**Hackathon Demo Guide**](#-hackathon-demo-mode) &bull;
+### 🌐 **[🔗 CLICK HERE TO OPEN THE LIVE DEMO](https://rishisharma029.github.io/lien-guard/)**
+
+[**🚀 Live Demo**](https://rishisharma029.github.io/lien-guard/) &bull;
+[**⚡ Hackathon Demo Guide**](#-hackathon-demo-mode) &bull;
+[**🏛️ Cyber Directory**](https://rishisharma029.github.io/lien-guard/directory) &bull;
 [**Inbound Email Intelligence**](#-intelligent-inbound-email--reply-processing) &bull;
 [**Compliance Workflow**](#-compliance-aware-workflow) &bull;
 [**Architecture**](./ARCHITECTURE.md) &bull;
@@ -32,9 +37,9 @@
 
 ## 📑 Table of Contents
 
+- [🌐 Live Demo & Deployment](#-live-demo--deployment)
 - [Overview](#-overview)
 - [🏛️ Official Authority Directory & Intelligent Routing](#-official-government-authority-directory--intelligent-routing)
-- [⚖️ Compliance-Aware Workflow](#-compliance-aware-workflow)
 - [📨 Intelligent Inbound Email & AI Reply Processing](#-intelligent-inbound-email--ai-reply-processing)
 - [⚡ Hackathon Demo Mode](#-hackathon-demo-mode)
 - [🚀 Key Features](#-key-features)
@@ -46,6 +51,17 @@
   - [Installation & Quickstart](#installation--quickstart)
 - [🧪 Testing & Quality Assurance](#-testing--quality-assurance)
 - [📄 License](#-license)
+
+---
+
+## 🌐 Live Demo & Deployment
+
+| Resource | Link | Description |
+| :--- | :--- | :--- |
+| **🚀 Live Production Demo** | [**https://rishisharma029.github.io/lien-guard/**](https://rishisharma029.github.io/lien-guard/) | Interactive demo hosted directly on GitHub Pages |
+| **🏛️ Cyber Crime Directory** | [**Directory Showcase**](https://rishisharma029.github.io/lien-guard/directory) | 36 official state & UT cyber crime stations across India |
+| **⚡ Hackathon Demo Center** | [**Demo Workflow**](https://rishisharma029.github.io/lien-guard/demo) | 5-step automated workflow demonstration |
+| **📦 GitHub Repository** | [**Rishisharma029/lien-guard**](https://github.com/Rishisharma029/lien-guard) | Complete open-source codebase & architecture |
 
 ---
 

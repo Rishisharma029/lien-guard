@@ -14,26 +14,30 @@ import { ENV, isOriginAllowed } from "./env";
 import { logSecurityEvent } from "../securityLog";
 import { apiRateLimiter } from "../rateLimit";
 
-function isPortAvailable(port: number): Promise<boolean> {
+function isPortAvailable(port: number, host: string = "0.0.0.0"): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => {
+        setTimeout(() => resolve(true), 50);
+      });
     });
-    server.on("error", () => resolve(false));
+    server.listen(port, host);
   });
 }
 
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
+async function findAvailablePort(startPort: number = 3000, host: string = "0.0.0.0"): Promise<number> {
   for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
+    if (await isPortAvailable(port, host)) {
       return port;
     }
   }
-  throw new Error(`No available port found starting from ${startPort}`);
+  return startPort;
 }
 
 async function startServer() {
+  console.log("[LienGuard] Initializing server...");
   const app = express();
   const server = createServer(app);
 

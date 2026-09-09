@@ -16,7 +16,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
   const demoLogin = trpc.auth.demoLogin.useMutation({
-    onSuccess: () => { window.location.assign("/workspace"); },
+    onSuccess: async () => {
+      await utils.auth.me.invalidate();
+      await utils.auth.me.refetch();
+    },
+    onError: () => {
+      window.location.reload();
+    },
   });
   const localDemoAvailable = true;
   const beginAccess = () => {
