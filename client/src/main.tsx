@@ -54,16 +54,14 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+import { handleStaticTrpcRequest } from "./lib/staticMockEngine";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
       headers() {
-        // Preview auto-login fallback: when the browser blocks iframe cookies
-        // (Safari ITP / private browsing / WebView), the runtime mirrors the
-        // session into sessionStorage so we can forward it as a Bearer token.
-        // The regular OAuth cookie flow keeps working and takes priority server-side.
         try {
           const raw = sessionStorage.getItem("manus-cookie");
           if (raw) {
@@ -80,33 +78,68 @@ const trpcClient = trpc.createClient({
         return {};
       },
       async fetch(input, init) {
-        try {
-          const res = await globalThis.fetch(input, {
-            ...(init ?? {}),
-            credentials: "include",
-          });
+        const isStaticHost =
+          typeof window !== "undefined" &&
+          (window.location.hostname.includes("github.io") || window.location.pathname.startsWith("/lien-guard"));
 
-          const contentType = res.headers.get("content-type") || "";
-          if (!contentType.includes("application/json") && !contentType.includes("text/json")) {
-            // When hosted statically or backend is unreachable, gracefully return empty tRPC data
-            return new Response(
-              JSON.stringify([{ result: { data: { json: null } } }]),
-              {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              }
-            );
+        if (!isStaticHost) {
+          try {
+            const res = await globalThis.fetch(input, {
+              ...(init ?? {}),
+              credentials: "include",
+            });
+
+            const contentType = res.headers.get("content-type") || "";
+            if (res.ok && (contentType.includes("application/json") || contentType.includes("text/json"))) {
+              return res;
+            }
+          } catch {
+            // Backend offline, fall through to static mock engine
+          }
+        }
+
+        // Parse tRPC request and execute with staticMockEngine
+        try {
+          const urlStr = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+          const url = new URL(urlStr, window.location.origin);
+          const trpcPath = url.pathname.replace(/^\/api\/trpc\/?/, "");
+          const paths = trpcPath.split(",").filter(Boolean);
+
+          let inputMap: Record<string, any> = {};
+          if (init?.body) {
+            try {
+              const bodyParsed = JSON.parse(init.body as string);
+              inputMap = bodyParsed;
+            } catch {}
+          } else if (url.searchParams.has("input")) {
+            try {
+              const queryInput = JSON.parse(url.searchParams.get("input") || "{}");
+              inputMap = queryInput;
+            } catch {}
           }
 
-          return res;
-        } catch {
-          return new Response(
-            JSON.stringify([{ result: { data: { json: null } } }]),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
+          const results = paths.map((pathKey, idx) => {
+            const rawItem = inputMap[String(idx)] ?? inputMap;
+            const cleanInput = rawItem?.json ?? rawItem;
+            const data = handleStaticTrpcRequest(pathKey, cleanInput);
+            return {
+              result: {
+                data: {
+                  json: data,
+                },
+              },
+            };
+          });
+
+          return new Response(JSON.stringify(results.length === 1 && !url.searchParams.has("batch") ? results[0] : results), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (engineErr) {
+          return new Response(JSON.stringify([{ result: { data: { json: null } } }]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         }
       },
     }),
